@@ -394,6 +394,22 @@
         padding: 15px 20px;
       }
     }
+    
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -556,6 +572,9 @@
         <h2>Summary</h2>
         <div class="summary-card" id="summaryCard"></div>
         <p class="info-text">Click Confirm to place your order.</p>
+        <button type="button" class="btn btn-primary" id="confirmOrderBtn" style="width: 100%; margin-top: 10px;">
+          Confirm Order
+        </button>
       </div>
 
       <!-- Success -->
@@ -591,6 +610,7 @@
     const serviceFeeField = document.getElementById('serviceFeeField');
     const grandTotalField = document.getElementById('grandTotalField');
     const selectedServiceField = document.getElementById('selectedService');
+    const confirmOrderBtn = document.getElementById('confirmOrderBtn');
     let generatedOrderId = '';
 
     const serviceFees = {
@@ -599,9 +619,6 @@
       pickup: 25,
       other: 15
     };
-
-    // Web App URL for Google Apps Script
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec';
 
     // Initialize service card selection
     document.querySelectorAll('.service-card').forEach(card => {
@@ -745,7 +762,7 @@
         nextBtn.style.display = 'none';
       } else {
         nextBtn.style.display = 'inline-block';
-        nextBtn.textContent = step === totalSteps-1 ? 'Confirm' : 'Next';
+        nextBtn.textContent = step === totalSteps-1 ? 'Next' : 'Next';
       }
     }
 
@@ -823,52 +840,68 @@
       `;
     }
 
-    // Form submission function
-    async function submitOrder() {
-      try {
-        const form = document.getElementById('orderForm');
-        const formData = new FormData(form);
+    // Function to submit form data to Google Sheets
+    function submitFormToGoogleSheets() {
+      return new Promise((resolve, reject) => {
+        // Get all form data
+        const formData = new FormData(document.getElementById('orderForm'));
+        const data = {};
         
-        // Show loading state
-        nextBtn.disabled = true;
-        nextBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-        
-        // Convert FormData to URL-encoded string
-        const urlEncodedData = new URLSearchParams();
-        for (const [key, value] of formData) {
-          urlEncodedData.append(key, value);
+        // Convert FormData to object
+        for (let [key, value] of formData.entries()) {
+          data[key] = value;
         }
         
-        const response = await fetch(WEB_APP_URL, {
+        // Add timestamp
+        data.timestamp = new Date().toISOString();
+        
+        // Send data to Google Apps Script
+        fetch('https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec', {
           method: 'POST',
+          mode: 'no-cors',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/json',
           },
-          body: urlEncodedData
+          body: JSON.stringify(data)
+        })
+        .then(() => {
+          // Since we're using no-cors mode, we can't check the response
+          // But we'll assume it was successful
+          console.log('Form submitted successfully');
+          resolve();
+        })
+        .catch((error) => {
+          console.error('Error submitting form:', error);
+          reject(error);
         });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-          // Success - move to confirmation step
-          currentStep++;
-          showStep(currentStep);
-          orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
-        } else {
-          alert('Error submitting order: ' + result.message);
-          // Reset button state
-          nextBtn.disabled = false;
-          nextBtn.textContent = 'Confirm';
-        }
-        
-      } catch (error) {
-        console.error('Submission error:', error);
-        alert('Failed to submit order. Please try again.');
-        // Reset button state
-        nextBtn.disabled = false;
-        nextBtn.textContent = 'Confirm';
-      }
+      });
     }
+
+    // Confirm Order Button Event Listener
+    confirmOrderBtn.addEventListener('click', async function() {
+      // Show loading state
+      const originalText = confirmOrderBtn.innerHTML;
+      confirmOrderBtn.innerHTML = '<span class="spinner"></span> Submitting Order...';
+      confirmOrderBtn.disabled = true;
+      
+      try {
+        // Submit form to Google Sheets
+        await submitFormToGoogleSheets();
+        
+        // Show success message
+        orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
+        currentStep = 5;
+        showStep(currentStep);
+      } catch (error) {
+        // Show error message
+        alert('There was an error submitting your order. Please try again.');
+        console.error('Submission error:', error);
+        
+        // Reset button state
+        confirmOrderBtn.innerHTML = originalText;
+        confirmOrderBtn.disabled = false;
+      }
+    });
 
     nextBtn.addEventListener('click', () => {
       if (currentStep < totalSteps) {
@@ -895,13 +928,6 @@
               summaryCard.innerHTML = '<p style="color: #ff6b6b;">Error generating summary. Please go back and try again.</p>';
             }
           });
-        }
-        
-        // Handle final confirmation step
-        if (currentStep === totalSteps - 1) {
-          // This is the confirmation step - submit the form
-          submitOrder();
-          return; // Prevent showing the step until submission is complete
         }
         
         showStep(currentStep);
