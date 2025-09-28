@@ -349,6 +349,42 @@
       text-align: center;
     }
 
+    /* Success styles */
+    .success-message {
+      background: rgba(92, 198, 195, 0.1);
+      border: 1px solid rgba(92, 198, 195, 0.3);
+      color: var(--accent-teal);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    /* Debug panel */
+    .debug-panel {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 20px;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .debug-panel h4 {
+      color: var(--accent-teal);
+      margin-bottom: 10px;
+    }
+
+    .debug-panel pre {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
     /* Animated geometric shapes in background */
     .shape {
       position: fixed;
@@ -595,8 +631,15 @@
       <div class="form-step" data-step="4">
         <h2>Summary</h2>
         <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="successMessage" class="success-message" style="display: none;"></div>
         <div class="summary-card" id="summaryCard"></div>
         <p class="info-text">Click Confirm to place your order.</p>
+        
+        <!-- Debug panel for testing -->
+        <div class="debug-panel" id="debugPanel" style="display: none;">
+          <h4>Debug Information</h4>
+          <div id="debugContent"></div>
+        </div>
       </div>
 
       <!-- Success -->
@@ -613,6 +656,7 @@
       <div class="nav-buttons">
         <button type="button" class="btn btn-secondary" id="prevBtn">Back</button>
         <button type="button" class="btn btn-primary" id="nextBtn"><span>Next</span></button>
+        <button type="button" class="btn btn-secondary" id="debugBtn" onclick="toggleDebug()" style="display: none;">Debug</button>
       </div>
     </form>
   </div>
@@ -633,9 +677,12 @@
     const grandTotalField = document.getElementById('grandTotalField');
     const selectedServiceField = document.getElementById('selectedService');
     const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const debugPanel = document.getElementById('debugPanel');
+    const debugContent = document.getElementById('debugContent');
     let generatedOrderId = '';
 
-    // Google Apps Script URL
+    // Google Apps Script URL - Your deployed web app URL
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec';
 
     const serviceFees = {
@@ -645,12 +692,38 @@
       other: 15
     };
 
+    // Enable debug mode by adding ?debug=1 to URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.get('debug') === '1';
+    if (debugMode) {
+      document.getElementById('debugBtn').style.display = 'inline-block';
+    }
+
+    function toggleDebug() {
+      debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function logDebug(message, data = null) {
+      if (debugMode) {
+        console.log(message, data);
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] ${message}`;
+        if (data) {
+          debugContent.innerHTML += `<pre>${logEntry}\n${JSON.stringify(data, null, 2)}</pre>`;
+        } else {
+          debugContent.innerHTML += `<pre>${logEntry}</pre>`;
+        }
+        debugContent.scrollTop = debugContent.scrollHeight;
+      }
+    }
+
     // Initialize service card selection
     document.querySelectorAll('.service-card').forEach(card => {
       card.addEventListener('click', function() {
         document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
         this.classList.add('selected');
         selectedServiceField.value = this.dataset.service;
+        logDebug('Service selected:', this.dataset.service);
         
         // Show/hide service-specific fields
         updateServiceSpecificFields(this.dataset.service);
@@ -679,6 +752,8 @@
       } else {
         defaultFields.style.display = 'block';
       }
+      
+      logDebug('Updated service fields for:', service);
     }
 
     // Order Type Toggle
@@ -687,6 +762,7 @@
         document.querySelectorAll('#orderTypeToggle .toggle-option').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         document.getElementById('orderTypeField').value = this.dataset.type;
+        logDebug('Order type selected:', this.dataset.type);
       });
     });
 
@@ -696,6 +772,7 @@
         document.querySelectorAll('#paymentToggle .toggle-option').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         document.getElementById('paymentField').value = this.dataset.payment;
+        logDebug('Payment method selected:', this.dataset.payment);
         
         // Show/hide Gcash reference field
         const gcashField = document.getElementById('gcashField');
@@ -789,20 +866,32 @@
         nextBtn.style.display = 'inline-block';
         nextBtn.innerHTML = step === totalSteps-1 ? '<span>Confirm</span>' : '<span>Next</span>';
       }
+      
+      logDebug('Showing step:', step);
     }
 
     function showError(message) {
       errorMessage.textContent = message;
       errorMessage.style.display = 'block';
+      successMessage.style.display = 'none';
+      logDebug('Error shown:', message);
       setTimeout(() => {
         errorMessage.style.display = 'none';
       }, 5000);
+    }
+
+    function showSuccess(message) {
+      successMessage.textContent = message;
+      successMessage.style.display = 'block';
+      errorMessage.style.display = 'none';
+      logDebug('Success shown:', message);
     }
 
     function generateSummary() {
       // Generate Order ID
       generatedOrderId = generateOrderId();
       orderIdInput.value = generatedOrderId;
+      logDebug('Generated Order ID:', generatedOrderId);
 
       // Get values once
       const selectedServiceElement = document.querySelector('.service-card.selected');
@@ -848,6 +937,8 @@
       serviceFeeField.value = fee;
       grandTotalField.value = grandTotal;
 
+      logDebug('Calculated totals:', { totalItems, totalPrice, fee, grandTotal });
+
       // Build payment text
       let paymentText = paymentValue;
       const gcashRefValue = document.getElementById('gcashRef').value;
@@ -873,82 +964,135 @@
       `;
     }
 
-    // Function to collect all form data
-    function collectFormData() {
+    // Function to collect all form data for Google Sheets
+    function collectFormDataForSheets() {
       const selectedService = selectedServiceField.value;
-      const formData = new FormData();
-      
-      // Basic order info
-      formData.append('orderId', orderIdInput.value);
-      formData.append('timestamp', new Date().toISOString());
-      formData.append('service', selectedService);
-      formData.append('customerName', document.getElementById('customerName').value);
-      formData.append('building', document.getElementById('building').value);
-      formData.append('room', document.getElementById('room').value);
-      formData.append('contact', document.getElementById('contact').value);
-      formData.append('payment', document.getElementById('paymentField').value);
-      formData.append('totalItems', totalItemsField.value);
-      formData.append('totalPrice', totalPriceField.value);
-      formData.append('serviceFee', serviceFeeField.value);
-      formData.append('grandTotal', grandTotalField.value);
+      const data = {
+        // Basic order info
+        orderId: orderIdInput.value,
+        timestamp: new Date().toISOString(),
+        service: selectedService,
+        customerName: document.getElementById('customerName').value,
+        building: document.getElementById('building').value,
+        room: document.getElementById('room').value,
+        contact: document.getElementById('contact').value,
+        payment: document.getElementById('paymentField').value,
+        totalItems: totalItemsField.value,
+        totalPrice: totalPriceField.value,
+        serviceFee: serviceFeeField.value,
+        grandTotal: grandTotalField.value,
+        status: 'Pending'
+      };
       
       // Service-specific data
       if (selectedService === 'pickup') {
-        formData.append('pickupType', document.getElementById('pickupType').value);
-        formData.append('pickupLocation', document.getElementById('pickupLocation').value);
-        formData.append('recipientInfo', document.getElementById('recipientInfo').value);
-        formData.append('parcelDetails', document.getElementById('parcelDetails').value);
-        formData.append('items', document.getElementById('pickupItems').value);
+        data.pickupType = document.getElementById('pickupType').value;
+        data.pickupLocation = document.getElementById('pickupLocation').value;
+        data.recipientInfo = document.getElementById('recipientInfo').value;
+        data.parcelDetails = document.getElementById('parcelDetails').value;
+        data.items = document.getElementById('pickupItems').value;
+        data.orderType = '';
+        data.vendor = '';
+        data.serviceType = '';
+        data.serviceDescription = '';
+        data.serviceLocation = '';
       } else if (selectedService === 'other') {
-        formData.append('serviceType', document.getElementById('serviceType').value);
-        formData.append('serviceDescription', document.getElementById('serviceDescription').value);
-        formData.append('serviceLocation', document.getElementById('serviceLocation').value);
-        formData.append('items', document.getElementById('otherItems').value);
+        data.serviceType = document.getElementById('serviceType').value;
+        data.serviceDescription = document.getElementById('serviceDescription').value;
+        data.serviceLocation = document.getElementById('serviceLocation').value;
+        data.items = document.getElementById('otherItems').value;
+        data.orderType = '';
+        data.vendor = '';
+        data.pickupType = '';
+        data.pickupLocation = '';
+        data.recipientInfo = '';
+        data.parcelDetails = '';
       } else {
-        formData.append('orderType', document.getElementById('orderTypeField').value);
-        formData.append('vendor', document.getElementById('vendor').value);
-        formData.append('items', document.getElementById('items').value);
+        data.orderType = document.getElementById('orderTypeField').value;
+        data.vendor = document.getElementById('vendor').value;
+        data.items = document.getElementById('items').value;
+        data.pickupType = '';
+        data.pickupLocation = '';
+        data.recipientInfo = '';
+        data.parcelDetails = '';
+        data.serviceType = '';
+        data.serviceDescription = '';
+        data.serviceLocation = '';
       }
       
       // Gcash reference if applicable
       const gcashRef = document.getElementById('gcashRef').value;
       if (gcashRef) {
-        formData.append('gcashRef', gcashRef);
+        data.gcashRef = gcashRef;
+      } else {
+        data.gcashRef = '';
       }
       
-      // Order status
-      formData.append('status', 'Pending');
-      
-      return formData;
+      return data;
     }
 
-    // Function to submit order to Google Sheets
+    // Function to submit order to Google Sheets with proper error handling
     async function submitOrder() {
       try {
         // Show loading state
         nextBtn.classList.add('btn-loading');
         nextBtn.innerHTML = '<span>Submitting...</span>';
         
-        const formData = collectFormData();
+        const data = collectFormDataForSheets();
+        logDebug('Form data collected:', data);
+        
+        // Create FormData object (works better with Google Apps Script)
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(data)) {
+          formData.append(key, value);
+        }
+        
+        logDebug('Submitting to:', GOOGLE_SCRIPT_URL);
+        logDebug('Form data entries:', [...formData.entries()]);
         
         const response = await fetch(GOOGLE_SCRIPT_URL, {
           method: 'POST',
           body: formData,
-          mode: 'no-cors' // Required for Google Apps Script
+          redirect: 'follow'
         });
         
-        // Since we're using no-cors, we can't read the response
-        // We'll assume success if no error is thrown
-        console.log('Order submitted successfully');
+        logDebug('Response status:', response.status);
+        logDebug('Response ok:', response.ok);
         
-        // Move to success page
-        currentStep = totalSteps;
-        orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
-        showStep(currentStep);
+        // Handle response
+        const result = await response.text();
+        logDebug('Response text:', result);
+        
+        try {
+          const jsonResult = JSON.parse(result);
+          logDebug('Parsed JSON result:', jsonResult);
+          
+          if (jsonResult.success) {
+            showSuccess('Order submitted successfully!');
+            // Move to success page
+            currentStep = totalSteps;
+            orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
+            showStep(currentStep);
+          } else {
+            throw new Error(jsonResult.message || jsonResult.error || 'Submission failed');
+          }
+        } catch (parseError) {
+          logDebug('JSON parse error:', parseError);
+          // If response is not JSON, treat as success if status is OK
+          if (response.ok) {
+            showSuccess('Order submitted successfully!');
+            currentStep = totalSteps;
+            orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
+            showStep(currentStep);
+          } else {
+            throw new Error(`Server responded with: ${result}`);
+          }
+        }
         
       } catch (error) {
         console.error('Error submitting order:', error);
-        showError('Failed to submit order. Please check your connection and try again.');
+        logDebug('Submission error:', error);
+        showError(`Failed to submit order: ${error.message}. Please check your connection and try again.`);
         
         // Reset button state
         nextBtn.classList.remove('btn-loading');
@@ -984,6 +1128,7 @@
               generateSummary();
             } catch (error) {
               console.error('Error generating summary:', error);
+              logDebug('Summary generation error:', error);
               summaryCard.innerHTML = '<p style="color: #ff6b6b;">Error generating summary. Please go back and try again.</p>';
             }
           });
@@ -998,13 +1143,15 @@
         currentStep--;
         showStep(currentStep);
         
-        // Reset any error messages when going back
+        // Reset any error/success messages when going back
         errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
       }
     });
 
     // Initialize
     showStep(currentStep);
+    logDebug('Form initialized');
   </script>
 </body>
 </html>
