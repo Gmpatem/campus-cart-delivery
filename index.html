@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Cart - Quick Order</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --primary-yellow: #FFD500;
+      --primary-blue: #004AAD;
+      --accent-teal: #5CC6C3;
+      --accent-orange: #FF8A00;
+      --white: #ffffff;
+      --light-gray: #f5f5f5;
+      --dark-blue: #0a1930;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0a1930, #152642, #1e3a6b);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+      color: var(--white);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .form-container {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .header {
+      background: rgba(0, 74, 173, 0.6);
+      color: var(--white);
+      padding: 25px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: rotate(45deg);
+      animation: shine 3s infinite linear;
+      z-index: 0;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      position: relative;
+      z-index: 1;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 3px;
+      margin-top: 15px;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-teal);
+      transition: width 0.4s ease;
+      border-radius: 3px;
+    }
+
+    .form-step {
+      display: none;
+      padding: 30px;
+    }
+    .form-step.active { display: block; }
+
+    .form-step h2 {
+      margin-bottom: 20px;
+      font-weight: 700;
+      color: var(--white);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .info-text {
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .service-grid {
+      display: grid;
+      grid-template-columns: repeat(2,1fr);
+      gap: 15px;
+      margin-bottom: 10px;
+    }
+
+    .service-card {
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--white);
+    }
+    
+    .service-card:hover { 
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .service-card.selected {
+      background: rgba(92, 198, 195, 0.2);
+      transform: scale(1.05);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+      border-color: var(--accent-teal);
+    }
+
+    label { 
+      font-weight: 600; 
+      display: block; 
+      margin-bottom: 8px; 
+      color: var(--white);
+    }
+    
+    input, textarea, select {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 20px;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      font-size: 1rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--white);
+      transition: all 0.3s ease;
+    }
+    
+    /* Select dropdown styling */
+    select {
+      cursor: pointer;
+    }
+    
+    select option {
+      background: rgba(10, 25, 48, 0.95);
+      color: var(--white);
+      padding: 10px;
+      border: none;
+    }
+    
+    select optgroup {
+      background: rgba(0, 74, 173, 0.8);
+      color: var(--white);
+      font-weight: 600;
+      padding: 8px;
+    }
+    
+    select option:hover,
+    select option:focus {
+      background: rgba(92, 198, 195, 0.3);
+      color: var(--white);
+    }
+    
+    select option:checked {
+      background: var(--accent-teal);
+      color: var(--white);
+    }
+    
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-teal);
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 0 3px rgba(92, 198, 195, 0.15);
+    }
+    
+    input::placeholder, textarea::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Toggle Button Styles */
+    .toggle-group {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .toggle-option {
+      flex: 1;
+      padding: 14px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+      transition: all 0.3s ease;
+      font-size: 1rem;
+    }
+    
+    .toggle-option:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--white);
+    }
+    
+    .toggle-option.active {
+      background: var(--accent-teal);
+      color: var(--white);
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(92, 198, 195, 0.3);
+    }
+
+    /* Hidden field styles */
+    .hidden-field {
+      display: none;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+    }
+    
+    .hidden-field.show {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      padding: 20px 30px;
+      background: rgba(0, 0, 0, 0.15);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn {
+      padding: 14px 25px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary { 
+      background: var(--primary-blue); 
+      color: var(--white);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    
+    .btn-primary:hover { 
+      background: var(--accent-teal);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+    }
+    
+    .btn-secondary { 
+      background: rgba(255, 255, 255, 0.12); 
+      color: var(--white);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-3px);
+    }
+
+    .summary-card {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--white);
+    }
+
+    .success-popup {
+      display: none;
+      text-align: center;
+      padding: 40px 30px;
+    }
+    
+    .success-icon {
+      font-size: 4rem;
+      color: var(--accent-teal);
+      margin-bottom: 20px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    /* Loading states */
+    .btn-loading {
+      position: relative;
+      pointer-events: none;
+    }
+    
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 2px solid transparent;
+      border-top: 2px solid var(--white);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    .btn-loading span {
+      opacity: 0;
+    }
+
+    /* Error styles */
+    .error-message {
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    /* Success styles */
+    .success-message {
+      background: rgba(92, 198, 195, 0.1);
+      border: 1px solid rgba(92, 198, 195, 0.3);
+      color: var(--accent-teal);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    /* Debug panel */
+    .debug-panel {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 20px;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .debug-panel h4 {
+      color: var(--accent-teal);
+      margin-bottom: 10px;
+    }
+
+    .debug-panel pre {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Animated geometric shapes in background */
+    .shape {
+      position: fixed;
+      z-index: -1;
+      opacity: 0.2;
+      animation: float 15s infinite linear;
+    }
+    
+    .circle1 {
+      width: 150px;
+      height: 150px;
+      background: linear-gradient(45deg, var(--primary-blue), var(--accent-teal));
+      top: 15%;
+      left: 10%;
+      border-radius: 50%;
+      animation-delay: 0s;
+    }
+
+    .circle2 {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(45deg, var(--accent-teal), var(--primary-blue));
+      bottom: 20%;
+      right: 15%;
+      border-radius: 50%;
+      animation-delay: -5s;
+    }
+
+    .triangle {
+      width: 0;
+      height: 0;
+      border-left: 60px solid transparent;
+      border-right: 60px solid transparent;
+      border-bottom: 100px solid rgba(92, 198, 195, 0.2);
+      top: 40%;
+      right: 20%;
+      animation: rotate 20s infinite linear;
+    }
+
+    /* Animations */
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    
+    @keyframes shine {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+    
+    @keyframes float {
+      0% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-15px) rotate(5deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+    
+    @keyframes rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      .service-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .toggle-group {
+        flex-direction: column;
+      }
+      
+      .form-step {
+        padding: 20px;
+      }
+      
+      .nav-buttons {
+        padding: 15px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Animated geometric shapes -->
+  <div class="shape circle1"></div>
+  <div class="shape circle2"></div>
+  <div class="shape triangle"></div>
+
+  <div class="form-container">
+    <div class="header">
+      <h1>Campus Cart Delivery</h1>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <form id="orderForm">
+      <input type="hidden" id="orderId" name="orderId">
+      <input type="hidden" id="totalItemsField" name="totalItems">
+      <input type="hidden" id="totalPriceField" name="totalPrice">
+      <input type="hidden" id="serviceFeeField" name="serviceFee">
+      <input type="hidden" id="grandTotalField" name="grandTotal">
+      <input type="hidden" id="selectedService" name="service">
+
+      <!-- Step 1 -->
+      <div class="form-step active" data-step="1">
+        <h2>Select Service</h2>
+        <p class="info-text">We offer pickup, delivery, grocery runs, and service errands. Choose one below:</p>
+        <div class="service-grid">
+          <div class="service-card" data-service="food">🍔 Food</div>
+          <div class="service-card" data-service="groceries">🛒 Groceries</div>
+          <div class="service-card" data-service="pickup">📦 Pickup</div>
+          <div class="service-card" data-service="other">🧺 Other</div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="form-step" data-step="2">
+        <h2>Order Details</h2>
+        <div id="serviceSpecificFields">
+          <!-- Default fields (for food and groceries) -->
+          <div id="defaultFields">
+            <label>Order Type</label>
+            <div class="toggle-group" id="orderTypeToggle">
+              <button type="button" class="toggle-option active" data-type="Itemized">Itemized</button>
+              <button type="button" class="toggle-option" data-type="Prepared">Prepared</button>
+            </div>
+            <input type="hidden" id="orderTypeField" name="orderType" value="Itemized">
+            
+            <label for="items">What do you need?</label>
+            <textarea id="items" name="items" rows="4" required placeholder="Example: Burger 1 @80, Sprite 2 @25"></textarea>
+            
+            <label for="vendor">Store/Vendor/Location</label>
+            <input type="text" id="vendor" name="vendor" placeholder="Enter source (store/vendor/location)">
+          </div>
+          
+          <!-- Pickup-specific fields -->
+          <div id="pickupFields" class="hidden-field">
+            <label for="pickupType">Pickup Type</label>
+            <select id="pickupType" name="pickupType">
+              <option value="Parcel">Parcel/Delivery</option>
+              <option value="Document">Document</option>
+              <option value="Food">Food Delivery</option>
+              <option value="Other">Other</option>
+            </select>
+            
+            <label for="pickupLocation">Pickup Location</label>
+            <input type="text" id="pickupLocation" name="pickupLocation" placeholder="Where should we pick up from?">
+            
+            <label for="recipientInfo">Recipient Information</label>
+            <textarea id="recipientInfo" name="recipientInfo" rows="3" placeholder="Recipient name, contact, and delivery address"></textarea>
+            
+            <label for="parcelDetails">Parcel Details</label>
+            <textarea id="parcelDetails" name="parcelDetails" rows="3" placeholder="Size, weight, contents, special handling instructions"></textarea>
+            
+            <label for="pickupItems">Items/Cost (for calculation)</label>
+            <textarea id="pickupItems" name="pickupItems" rows="3" placeholder="Example: Parcel pickup 1 @25, Delivery fee 1 @15"></textarea>
+          </div>
+          
+          <!-- Other service-specific fields -->
+          <div id="otherFields" class="hidden-field">
+            <label for="serviceType">Service Type</label>
+            <select id="serviceType" name="serviceType">
+              <option value="Laundry">Laundry</option>
+              <option value="Printing">Printing</option>
+              <option value="Errand">Errand</option>
+              <option value="Other">Other Service</option>
+            </select>
+            
+            <label for="serviceDescription">Service Description</label>
+            <textarea id="serviceDescription" name="serviceDescription" rows="3" placeholder="Describe what you need done"></textarea>
+            
+            <label for="serviceLocation">Service Location</label>
+            <input type="text" id="serviceLocation" name="serviceLocation" placeholder="Where should the service be performed?">
+            
+            <label for="otherItems">Items/Cost (for calculation)</label>
+            <textarea id="otherItems" name="otherItems" rows="3" placeholder="Example: Laundry service 1 @50, Detergent 1 @20"></textarea>
+          </div>
+        </div>
+        
+        <p class="info-text" id="pickupNote" style="display:none;">For pickups, please describe the package contents and specify the pickup location clearly.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="form-step" data-step="3">
+        <h2>Delivery Info</h2>
+        
+        <label for="customerName">Full Name</label>
+        <input type="text" id="customerName" name="customerName" placeholder="Enter your full name" required>
+        
+        <label for="building">Dorm/Building</label>
+        <select id="building" name="building" required>
+          <option value="">Select Housing Location</option>
+          <optgroup label="Ladies' Dormitories">
+            <option value="Cadena de Amor">Cadena de Amor</option>
+            <option value="Cattleya">Cattleya</option>
+            <option value="Chrysanthemum">Chrysanthemum</option>
+            <option value="Dama de Noche">Dama de Noche</option>
+            <option value="Sampaguita">Sampaguita</option>
+            <option value="Waling-Waling">Waling-Waling</option>
+          </optgroup>
+          <optgroup label="Men's Dormitories">
+            <option value="Acacia">Acacia</option>
+            <option value="Eastern">Eastern</option>
+            <option value="Mahogany">Mahogany</option>
+            <option value="Molave">Molave</option>
+            <option value="Narra">Narra</option>
+          </optgroup>
+          <optgroup label="Apartments">
+            <option value="Apartment A & B">Apartment A & B</option>
+            <option value="Apartment E & F">Apartment E & F</option>
+            <option value="Apartment G">Apartment G</option>
+            <option value="Champaka">Champaka</option>
+            <option value="Ilang-Ilang">Ilang-Ilang</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="Off-Campus Housing">Off-Campus Housing</option>
+          </optgroup>
+        </select>
+        
+        <label for="room">Room Number</label>
+        <input type="text" id="room" name="room" placeholder="Enter room number" required>
+        
+        <label for="contact">Contact Number</label>
+        <input type="tel" id="contact" name="contact" placeholder="09XXXXXXXXX" required>
+
+        <label>Payment Method</label>
+        <div class="toggle-group" id="paymentToggle">
+          <button type="button" class="toggle-option active" data-payment="COD">COD</button>
+          <button type="button" class="toggle-option" data-payment="Gcash">Gcash</button>
+        </div>
+        <input type="hidden" id="paymentField" name="payment" value="COD">
+        
+        <div class="hidden-field" id="gcashField">
+          <label for="gcashRef">Gcash Reference Number</label>
+          <input type="text" id="gcashRef" name="gcashRef" placeholder="Enter Gcash reference number">
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="form-step" data-step="4">
+        <h2>Summary</h2>
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="successMessage" class="success-message" style="display: none;"></div>
+        <div class="summary-card" id="summaryCard"></div>
+        <p class="info-text">Click Confirm to place your order.</p>
+        
+        <!-- Debug panel for testing -->
+        <div class="debug-panel" id="debugPanel" style="display: none;">
+          <h4>Debug Information</h4>
+          <div id="debugContent"></div>
+        </div>
+      </div>
+
+      <!-- Success -->
+      <div class="form-step success-popup" data-step="5">
+        <div class="success-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2>Order Placed Successfully!</h2>
+        <p class="info-text">Your order has been submitted. You'll receive SMS updates.</p>
+        <p id="orderIdDisplay"></p>
+      </div>
+
+      <!-- Navigation -->
+      <div class="nav-buttons">
+        <button type="button" class="btn btn-secondary" id="prevBtn">Back</button>
+        <button type="button" class="btn btn-primary" id="nextBtn"><span>Next</span></button>
+        <button type="button" class="btn btn-secondary" id="debugBtn" onclick="toggleDebug()" style="display: none;">Debug</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 5;
+    const steps = document.querySelectorAll('.form-step');
+    const nextBtn = document.getElementById('nextBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const progressFill = document.getElementById('progressFill');
+    const summaryCard = document.getElementById('summaryCard');
+    const orderIdDisplay = document.getElementById('orderIdDisplay');
+    const orderIdInput = document.getElementById('orderId');
+    const totalItemsField = document.getElementById('totalItemsField');
+    const totalPriceField = document.getElementById('totalPriceField');
+    const serviceFeeField = document.getElementById('serviceFeeField');
+    const grandTotalField = document.getElementById('grandTotalField');
+    const selectedServiceField = document.getElementById('selectedService');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const debugPanel = document.getElementById('debugPanel');
+    const debugContent = document.getElementById('debugContent');
+    let generatedOrderId = '';
+
+    // Google Apps Script URL - Your deployed web app URL
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec';
+
+    const serviceFees = {
+      food: 20,
+      groceries: 30,
+      pickup: 25,
+      other: 15
+    };
+
+    // Enable debug mode by adding ?debug=1 to URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.get('debug') === '1';
+    if (debugMode) {
+      document.getElementById('debugBtn').style.display = 'inline-block';
+    }
+
+    function toggleDebug() {
+      debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function logDebug(message, data = null) {
+      if (debugMode) {
+        console.log(message, data);
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] ${message}`;
+        if (data) {
+          debugContent.innerHTML += `<pre>${logEntry}\n${JSON.stringify(data, null, 2)}</pre>`;
+        } else {
+          debugContent.innerHTML += `<pre>${logEntry}</pre>`;
+        }
+        debugContent.scrollTop = debugContent.scrollHeight;
+      }
+    }
+
+    // Initialize service card selection
+    document.querySelectorAll('.service-card').forEach(card => {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedServiceField.value = this.dataset.service;
+        logDebug('Service selected:', this.dataset.service);
+        
+        // Show/hide service-specific fields
+        updateServiceSpecificFields(this.dataset.service);
+      });
+    });
+
+    // Update form fields based on selected service
+    function updateServiceSpecificFields(service) {
+      const defaultFields = document.getElementById('defaultFields');
+      const pickupFields = document.getElementById('pickupFields');
+      const otherFields = document.getElementById('otherFields');
+      const pickupNote = document.getElementById('pickupNote');
+      
+      // Hide all fields first
+      defaultFields.style.display = 'none';
+      pickupFields.classList.remove('show');
+      otherFields.classList.remove('show');
+      pickupNote.style.display = 'none';
+      
+      // Show relevant fields based on service
+      if (service === 'pickup') {
+        pickupFields.classList.add('show');
+        pickupNote.style.display = 'block';
+      } else if (service === 'other') {
+        otherFields.classList.add('show');
+      } else {
+        defaultFields.style.display = 'block';
+      }
+      
+      logDebug('Updated service fields for:', service);
+    }
+
+    // Order Type Toggle
+    document.querySelectorAll('#orderTypeToggle .toggle-option').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#orderTypeToggle .toggle-option').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('orderTypeField').value = this.dataset.type;
+        logDebug('Order type selected:', this.dataset.type);
+      });
+    });
+
+    // Payment Method Toggle
+    document.querySelectorAll('#paymentToggle .toggle-option').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#paymentToggle .toggle-option').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('paymentField').value = this.dataset.payment;
+        logDebug('Payment method selected:', this.dataset.payment);
+        
+        // Show/hide Gcash reference field
+        const gcashField = document.getElementById('gcashField');
+        const gcashInput = document.getElementById('gcashRef');
+        
+        if (this.dataset.payment === 'Gcash') {
+          gcashField.classList.add('show');
+          gcashInput.required = true;
+        } else {
+          gcashField.classList.remove('show');
+          gcashInput.required = false;
+          gcashInput.value = '';
+        }
+      });
+    });
+
+    function generateOrderId() {
+      const now = new Date();
+      const datePart = now.toISOString().slice(0,10).replace(/-/g,"");
+      const timePart = now.getHours().toString().padStart(2,'0') + now.getMinutes().toString().padStart(2,'0') + now.getSeconds().toString().padStart(2,'0');
+      return `CC-${datePart}-${timePart}`;
+    }
+
+    function calculateTotals(itemsText) {
+      let totalItems = 0;
+      let totalPrice = 0;
+      
+      if (!itemsText || itemsText.trim() === '') {
+        return { totalItems: 0, totalPrice: 0 };
+      }
+      
+      // More efficient regex and processing
+      const lines = itemsText.split(/[\n,]+/).filter(line => line.trim());
+      const regex = /(\d+)\s*@\s*(\d+)/;
+      
+      for (const line of lines) {
+        const match = line.match(regex);
+        if (match) {
+          const qty = parseInt(match[1], 10);
+          const price = parseInt(match[2], 10);
+          if (!isNaN(qty) && !isNaN(price)) {
+            totalItems += qty;
+            totalPrice += qty * price;
+          }
+        }
+      }
+      return { totalItems, totalPrice };
+    }
+
+    function validateStep(step) {
+      switch(step) {
+        case 1:
+          return document.querySelector('.service-card.selected') !== null;
+        case 2:
+          const selectedService = selectedServiceField.value;
+          if (selectedService === 'pickup') {
+            return document.getElementById('pickupLocation').value.trim() !== '' && 
+                   document.getElementById('pickupItems').value.trim() !== '';
+          } else if (selectedService === 'other') {
+            return document.getElementById('serviceDescription').value.trim() !== '' && 
+                   document.getElementById('otherItems').value.trim() !== '';
+          } else {
+            return document.getElementById('items').value.trim() !== '';
+          }
+        case 3:
+          const name = document.getElementById('customerName').value.trim();
+          const building = document.getElementById('building').value;
+          const room = document.getElementById('room').value.trim();
+          const contact = document.getElementById('contact').value.trim();
+          const payment = document.getElementById('paymentField').value;
+          const gcashRef = document.getElementById('gcashRef').value.trim();
+          
+          if (!name || !building || !room || !contact) return false;
+          if (payment === 'Gcash' && !gcashRef) return false;
+          return true;
+        default:
+          return true;
+      }
+    }
+
+    function showStep(step) {
+      steps.forEach(s => s.classList.remove('active'));
+      const current = document.querySelector(`[data-step="${step}"]`);
+      if (current) current.classList.add('active');
+      progressFill.style.width = ((step-1)/(totalSteps-1))*100 + '%';
+
+      prevBtn.style.display = step === 1 ? 'none' : 'inline-block';
+      if (step === totalSteps) {
+        nextBtn.style.display = 'none';
+      } else {
+        nextBtn.style.display = 'inline-block';
+        nextBtn.innerHTML = step === totalSteps-1 ? '<span>Confirm</span>' : '<span>Next</span>';
+      }
+      
+      logDebug('Showing step:', step);
+    }
+
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorMessage.style.display = 'block';
+      successMessage.style.display = 'none';
+      logDebug('Error shown:', message);
+      setTimeout(() => {
+        errorMessage.style.display = 'none';
+      }, 5000);
+    }
+
+    function showSuccess(message) {
+      successMessage.textContent = message;
+      successMessage.style.display = 'block';
+      errorMessage.style.display = 'none';
+      logDebug('Success shown:', message);
+    }
+
+    function generateSummary() {
+      // Generate Order ID
+      generatedOrderId = generateOrderId();
+      orderIdInput.value = generatedOrderId;
+      logDebug('Generated Order ID:', generatedOrderId);
+
+      // Get values once
+      const selectedServiceElement = document.querySelector('.service-card.selected');
+      const selectedService = selectedServiceElement?.dataset.service || '';
+      const paymentValue = document.getElementById('paymentField').value;
+      const orderTypeValue = document.getElementById('orderTypeField').value;
+      
+      // Get items text based on service type
+      let itemsText = '';
+      let serviceSpecificInfo = '';
+      
+      if (selectedService === 'pickup') {
+        itemsText = document.getElementById('pickupItems').value;
+        serviceSpecificInfo = `
+          <p><strong>Pickup Type:</strong> ${document.getElementById('pickupType').value}</p>
+          <p><strong>Pickup Location:</strong> ${document.getElementById('pickupLocation').value}</p>
+          <p><strong>Recipient Info:</strong> ${document.getElementById('recipientInfo').value}</p>
+          <p><strong>Parcel Details:</strong> ${document.getElementById('parcelDetails').value}</p>
+        `;
+      } else if (selectedService === 'other') {
+        itemsText = document.getElementById('otherItems').value;
+        serviceSpecificInfo = `
+          <p><strong>Service Type:</strong> ${document.getElementById('serviceType').value}</p>
+          <p><strong>Service Description:</strong> ${document.getElementById('serviceDescription').value}</p>
+          <p><strong>Service Location:</strong> ${document.getElementById('serviceLocation').value}</p>
+        `;
+      } else {
+        itemsText = document.getElementById('items').value;
+        serviceSpecificInfo = `
+          <p><strong>Order Type:</strong> ${orderTypeValue}</p>
+          <p><strong>Vendor/Location:</strong> ${document.getElementById('vendor').value}</p>
+        `;
+      }
+      
+      // Calculate totals efficiently
+      const { totalItems, totalPrice } = calculateTotals(itemsText);
+      const fee = serviceFees[selectedService] || 0;
+      const grandTotal = totalPrice + fee;
+
+      // Set hidden fields
+      totalItemsField.value = totalItems;
+      totalPriceField.value = totalPrice;
+      serviceFeeField.value = fee;
+      grandTotalField.value = grandTotal;
+
+      logDebug('Calculated totals:', { totalItems, totalPrice, fee, grandTotal });
+
+      // Build payment text
+      let paymentText = paymentValue;
+      const gcashRefValue = document.getElementById('gcashRef').value;
+      if (paymentValue === 'Gcash' && gcashRefValue) {
+        paymentText += ` (Ref: ${gcashRefValue})`;
+      }
+
+      // Use template literal for faster string building
+      summaryCard.innerHTML = `
+        <p><strong>Order ID:</strong> ${generatedOrderId}</p>
+        <p><strong>Customer Name:</strong> ${document.getElementById('customerName').value}</p>
+        <p><strong>Service:</strong> ${selectedService}</p>
+        ${serviceSpecificInfo}
+        <p><strong>Items/Cost Details:</strong> ${itemsText}</p>
+        <p><strong>Total Items:</strong> ${totalItems}</p>
+        <p><strong>Total Price:</strong> ₱${totalPrice}</p>
+        <p><strong>Service Fee:</strong> ₱${fee}</p>
+        <p><strong>Grand Total:</strong> ₱${grandTotal}</p>
+        <p><strong>Building:</strong> ${document.getElementById('building').value}</p>
+        <p><strong>Room:</strong> ${document.getElementById('room').value}</p>
+        <p><strong>Contact:</strong> ${document.getElementById('contact').value}</p>
+        <p><strong>Payment:</strong> ${paymentText}</p>
+      `;
+    }
+
+    // Function to collect all form data for Google Sheets
+    function collectFormDataForSheets() {
+      const selectedService = selectedServiceField.value;
+      const data = {
+        // Basic order info
+        orderId: orderIdInput.value,
+        timestamp: new Date().toISOString(),
+        service: selectedService,
+        customerName: document.getElementById('customerName').value,
+        building: document.getElementById('building').value,
+        room: document.getElementById('room').value,
+        contact: document.getElementById('contact').value,
+        payment: document.getElementById('paymentField').value,
+        totalItems: totalItemsField.value,
+        totalPrice: totalPriceField.value,
+        serviceFee: serviceFeeField.value,
+        grandTotal: grandTotalField.value,
+        status: 'Pending'
+      };
+      
+      // Service-specific data
+      if (selectedService === 'pickup') {
+        data.pickupType = document.getElementById('pickupType').value;
+        data.pickupLocation = document.getElementById('pickupLocation').value;
+        data.recipientInfo = document.getElementById('recipientInfo').value;
+        data.parcelDetails = document.getElementById('parcelDetails').value;
+        data.items = document.getElementById('pickupItems').value;
+        data.orderType = '';
+        data.vendor = '';
+        data.serviceType = '';
+        data.serviceDescription = '';
+        data.serviceLocation = '';
+      } else if (selectedService === 'other') {
+        data.serviceType = document.getElementById('serviceType').value;
+        data.serviceDescription = document.getElementById('serviceDescription').value;
+        data.serviceLocation = document.getElementById('serviceLocation').value;
+        data.items = document.getElementById('otherItems').value;
+        data.orderType = '';
+        data.vendor = '';
+        data.pickupType = '';
+        data.pickupLocation = '';
+        data.recipientInfo = '';
+        data.parcelDetails = '';
+      } else {
+        data.orderType = document.getElementById('orderTypeField').value;
+        data.vendor = document.getElementById('vendor').value;
+        data.items = document.getElementById('items').value;
+        data.pickupType = '';
+        data.pickupLocation = '';
+        data.recipientInfo = '';
+        data.parcelDetails = '';
+        data.serviceType = '';
+        data.serviceDescription = '';
+        data.serviceLocation = '';
+      }
+      
+      // Gcash reference if applicable
+      const gcashRef = document.getElementById('gcashRef').value;
+      if (gcashRef) {
+        data.gcashRef = gcashRef;
+      } else {
+        data.gcashRef = '';
+      }
+      
+      return data;
+    }
+
+    // Function to submit order to Google Sheets with proper error handling
+    async function submitOrder() {
+      try {
+        // Show loading state
+        nextBtn.classList.add('btn-loading');
+        nextBtn.innerHTML = '<span>Submitting...</span>';
+        
+        const data = collectFormDataForSheets();
+        logDebug('Form data collected:', data);
+        
+        // Create FormData object (works better with Google Apps Script)
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(data)) {
+          formData.append(key, value);
+        }
+        
+        logDebug('Submitting to:', GOOGLE_SCRIPT_URL);
+        logDebug('Form data entries:', [...formData.entries()]);
+        
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          body: formData,
+          redirect: 'follow'
+        });
+        
+        logDebug('Response status:', response.status);
+        logDebug('Response ok:', response.ok);
+        
+        // Handle response
+        const result = await response.text();
+        logDebug('Response text:', result);
+        
+        try {
+          const jsonResult = JSON.parse(result);
+          logDebug('Parsed JSON result:', jsonResult);
+          
+          if (jsonResult.success) {
+            showSuccess('Order submitted successfully!');
+            // Move to success page
+            currentStep = totalSteps;
+            orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
+            showStep(currentStep);
+          } else {
+            throw new Error(jsonResult.message || jsonResult.error || 'Submission failed');
+          }
+        } catch (parseError) {
+          logDebug('JSON parse error:', parseError);
+          // If response is not JSON, treat as success if status is OK
+          if (response.ok) {
+            showSuccess('Order submitted successfully!');
+            currentStep = totalSteps;
+            orderIdDisplay.textContent = `Your Order ID: ${generatedOrderId}`;
+            showStep(currentStep);
+          } else {
+            throw new Error(`Server responded with: ${result}`);
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error submitting order:', error);
+        logDebug('Submission error:', error);
+        showError(`Failed to submit order: ${error.message}. Please check your connection and try again.`);
+        
+        // Reset button state
+        nextBtn.classList.remove('btn-loading');
+        nextBtn.innerHTML = '<span>Confirm</span>';
+      }
+    }
+
+    nextBtn.addEventListener('click', async () => {
+      if (currentStep < totalSteps) {
+        // Validate current step
+        if (!validateStep(currentStep)) {
+          showError('Please fill in all required fields before proceeding.');
+          return;
+        }
+
+        // Handle final confirmation (step 4 -> step 5)
+        if (currentStep === 4) {
+          await submitOrder();
+          return;
+        }
+
+        // Move to next step
+        currentStep++;
+        
+        // Generate summary when moving TO step 4 (summary page)
+        if (currentStep === 4) {
+          // Show loading state briefly
+          summaryCard.innerHTML = '<p style="text-align: center; opacity: 0.7;"><i class="fas fa-spinner fa-spin"></i> Generating summary...</p>';
+          
+          // Use requestAnimationFrame for smooth UI updates
+          requestAnimationFrame(() => {
+            try {
+              generateSummary();
+            } catch (error) {
+              console.error('Error generating summary:', error);
+              logDebug('Summary generation error:', error);
+              summaryCard.innerHTML = '<p style="color: #ff6b6b;">Error generating summary. Please go back and try again.</p>';
+            }
+          });
+        }
+        
+        showStep(currentStep);
+      }
+    });
+
+    prevBtn.addEventListener('click', () => {
+      if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+        
+        // Reset any error/success messages when going back
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+      }
+    });
+
+    // Initialize
+    showStep(currentStep);
+    logDebug('Form initialized');
+  </script>
+</body>
+</html>
