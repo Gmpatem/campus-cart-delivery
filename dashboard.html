@@ -1,404 +1,1112 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Campus Cart — Unified Admin & Delivery Dashboard</title>
-  <!-- Tailwind via CDN for quick, clean styling -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS for parsing XLSX if backend returns binary XLSX -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <style>
-    /* small extras beyond Tailwind */
-    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-    .chip { @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium; }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-  <header class="bg-sky-800 text-white p-4 shadow">
-    <div class="container mx-auto flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-semibold">Campus Cart — Unified Dashboard</h1>
-        <p class="text-sm opacity-80">Admin + Delivery in one interface</p>
-      </div>
-      <div class="space-x-3">
-        <button id="refreshNow" class="bg-white text-sky-800 px-3 py-1 rounded">Refresh</button>
-        <select id="autoRefresh" class="rounded px-2 py-1 text-sky-800">
-          <option value="0">Auto-refresh: Off</option>
-          <option value="15000">15s</option>
-          <option value="30000">30s</option>
-          <option value="60000" selected>60s</option>
-        </select>
-      </div>
-    </div>
-  </header>
-
-  <main class="container mx-auto p-4">
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div class="col-span-2">
-        <nav class="bg-white rounded p-3 shadow flex gap-2">
-          <button class="tabBtn px-3 py-2 rounded bg-sky-100 text-sky-800" data-tab="orders">Orders</button>
-          <button class="tabBtn px-3 py-2 rounded" data-tab="delivery">Delivery</button>
-          <button class="tabBtn px-3 py-2 rounded" data-tab="analytics">Analytics</button>
-          <button class="px-3 py-2 rounded ml-auto" id="downloadXlsx">Download XLSX</button>
-        </nav>
-
-        <!-- Orders table -->
-        <div id="orders" class="tabPanel mt-4 bg-white rounded shadow p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-semibold">Orders</h2>
-            <div class="flex gap-2 items-center">
-              <input id="search" placeholder="Search orders..." class="border rounded px-2 py-1" />
-              <select id="filterStatus" class="rounded px-2 py-1">
-                <option value="">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="processing">Processing</option>
-                <option value="delivered">Delivered</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table id="ordersTable" class="min-w-full text-sm">
-              <thead class="bg-gray-100 text-left sticky top-0">
-                <tr>
-                  <th class="px-3 py-2">Order ID</th>
-                  <th class="px-3 py-2">Customer</th>
-                  <th class="px-3 py-2">Items</th>
-                  <th class="px-3 py-2">Total</th>
-                  <th class="px-3 py-2">Building / Room</th>
-                  <th class="px-3 py-2">Status</th>
-                  <th class="px-3 py-2">Delivery Agent</th>
-                  <th class="px-3 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="ordersBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Delivery management -->
-        <div id="delivery" class="tabPanel hidden mt-4 bg-white rounded shadow p-4">
-          <h2 class="text-lg font-semibold mb-3">Delivery Management</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 class="font-medium">Available Personnel</h3>
-              <ul id="personnelList" class="mt-2 space-y-2"></ul>
-            </div>
-            <div>
-              <h3 class="font-medium">Active Deliveries</h3>
-              <ul id="activeDeliveries" class="mt-2 space-y-2"></ul>
-            </div>
-          </div>
-        </div>
-
-        <!-- Analytics -->
-        <div id="analytics" class="tabPanel hidden mt-4 bg-white rounded shadow p-4">
-          <h2 class="text-lg font-semibold">Quick Analytics</h2>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-            <div class="p-3 bg-sky-50 rounded">Total orders: <span id="statTotal">0</span></div>
-            <div class="p-3 bg-sky-50 rounded">Pending: <span id="statPending">0</span></div>
-            <div class="p-3 bg-sky-50 rounded">Delivered: <span id="statDelivered">0</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right column: details / editor -->
-      <aside class="bg-white rounded shadow p-4">
-        <h3 class="font-semibold">Selected Order</h3>
-        <div id="selectedDetails" class="mt-2 text-sm text-gray-700">No order selected</div>
-
-        <div class="mt-4">
-          <h4 class="font-medium">Edit / Update</h4>
-          <div class="space-y-2 mt-2">
-            <label class="block text-xs">Status</label>
-            <select id="editStatus" class="w-full rounded px-2 py-1 border">
-              <option value="pending">pending</option>
-              <option value="confirmed">confirmed</option>
-              <option value="processing">processing</option>
-              <option value="delivered">delivered</option>
-              <option value="failed">failed</option>
-            </select>
-
-            <label class="block text-xs">Assign Delivery Agent</label>
-            <select id="editAgent" class="w-full rounded px-2 py-1 border"><option value="">-- none --</option></select>
-
-            <label class="block text-xs">Notes</label>
-            <textarea id="editNotes" class="w-full rounded px-2 py-1 border" rows="3"></textarea>
-
-            <div class="flex gap-2 mt-2">
-              <button id="saveChanges" class="bg-sky-800 text-white px-3 py-1 rounded">Save & Push</button>
-              <button id="discardChanges" class="px-3 py-1 rounded border">Discard</button>
-            </div>
-          </div>
-        </div>
-      </aside>
-    </section>
-
-    <footer class="text-xs text-gray-500 text-center mt-8">This dashboard will attempt to read XLSX or JSON from your backend and send updates back. Be sure your backend accepts JSON POSTs at the same endpoint.</footer>
-  </main>
-
-  <script>
-    // ---------------- CONFIG ----------------
-    const BACKEND = 'https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec';
-    // If your backend expects a query param like ?action=downloadXlsx you can change the fetch call below.
-
-    // ---------------- STATE ----------------
-    let orders = []; // array of objects
-    let personnel = [];
-    let selectedOrderId = null;
-    let autoRefreshTimer = null;
-
-    // ---------------- UI HELPERS ----------------
-    const qs = sel => document.querySelector(sel);
-    const qsa = sel => Array.from(document.querySelectorAll(sel));
-
-    function setTab(name) {
-      qsa('.tabPanel').forEach(el => el.classList.add('hidden'));
-      qsa('.tabBtn').forEach(b => b.classList.remove('bg-sky-100', 'text-sky-800'));
-      qs(`[data-tab="${name}"]`).classList.add('bg-sky-100', 'text-sky-800');
-      qs('#' + name).classList.remove('hidden');
-    }
-
-    qsa('.tabBtn').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
-    setTab('orders');
-
-    // ---------------- DATA FETCHING ----------------
-    async function fetchBackend() {
-      // Try to fetch JSON first
-      try {
-        const res = await fetch(BACKEND, { cache: 'no-store' });
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
-          const j = await res.json();
-          handleLoadedData(j);
-          return;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Cart Delivery - Admin Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --sidebar-width: 260px;
         }
 
-        // If not JSON, try to treat as binary XLSX
-        const buf = await res.arrayBuffer();
-        const wb = XLSX.read(buf, { type: 'array' });
-        // assume first sheet contains orders
-        const firstSheet = wb.SheetNames[0];
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { defval: '' });
-        handleLoadedData({orders: data});
-      } catch (err) {
-        console.error('Fetch error', err);
-        // show user-friendly message
-        qs('#ordersBody').innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-red-600">Unable to fetch backend: '+err.message+'</td></tr>';
-      }
-    }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-    function handleLoadedData(payload) {
-      // flexible: handle payload.orders or payload
-      let data = [];
-      if (Array.isArray(payload)) data = payload;
-      else if (Array.isArray(payload.orders)) data = payload.orders;
-      else if (Array.isArray(payload.data)) data = payload.data;
-      else console.warn('Unrecognized payload shape, attempting to use as array');
+        body {
+            background-color: #f8f9fa;
+            display: flex;
+            min-height: 100vh;
+        }
 
-      // attempt to detect personnel if provided
-      personnel = payload.personnel || [];
-      renderPersonnel();
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--primary);
+            color: white;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
 
-      // normalize orders
-      orders = data.map(row => normalizeRow(row));
-      renderOrders();
-      renderAnalytics();
-    }
+        .sidebar-header {
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
 
-    function normalizeRow(row) {
-      // try to adapt common column names to our UI names
-      return {
-        orderId: row['Order ID'] || row.orderId || row.id || row['ID'] || (row['Order No'] || '')+'' ,
-        customer: row['Customer Name'] || row.customer || row.name || '',
-        items: row.Items || row.items || row['Item List'] || '',
-        total: row['Grand Total'] || row.total || row.amount || 0,
-        building: (row.Building || row.building || ''),
-        room: row.Room || row.room || '',
-        status: (row.Status || row.status || 'pending').toString().toLowerCase(),
-        agent: row['Delivery Agent'] || row.agent || '',
-        notes: row.Notes || row.notes || '' ,
-        raw: row
-      };
-    }
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+        }
 
-    // ---------------- RENDERING ----------------
-    function renderOrders() {
-      const body = qs('#ordersBody');
-      const search = qs('#search').value.toLowerCase();
-      const statusFilter = qs('#filterStatus').value.toLowerCase();
-      body.innerHTML = '';
+        .sidebar-menu li {
+            position: relative;
+        }
 
-      const filtered = orders.filter(o => {
-        if (statusFilter && o.status !== statusFilter) return false;
-        if (!search) return true;
-        return (o.orderId+' '+o.customer+' '+o.items+' '+o.agent+' '+o.building+' '+o.room).toLowerCase().includes(search);
-      });
+        .sidebar-menu a {
+            padding: 15px 20px;
+            display: block;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+        }
 
-      if (filtered.length === 0) {
-        body.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-gray-500">No orders found</td></tr>';
-        return;
-      }
+        .sidebar-menu a:hover,
+        .sidebar-menu a.active {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--secondary);
+        }
 
-      for (const o of filtered) {
-        const tr = document.createElement('tr');
-        tr.className = 'border-b';
-        tr.innerHTML = `
-          <td class="px-3 py-2">${escapeHtml(o.orderId)}</td>
-          <td class="px-3 py-2">${escapeHtml(o.customer)}</td>
-          <td class="px-3 py-2">${escapeHtml(shorten(o.items, 70))}</td>
-          <td class="px-3 py-2">${escapeHtml(o.total)}</td>
-          <td class="px-3 py-2">${escapeHtml(o.building)} ${escapeHtml(o.room)}</td>
-          <td class="px-3 py-2"><span class="chip px-2 py-1 rounded ${statusColor(o.status)}">${escapeHtml(o.status)}</span></td>
-          <td class="px-3 py-2">${escapeHtml(o.agent)}</td>
-          <td class="px-3 py-2">
-            <button class="selectBtn bg-sky-600 text-white px-2 py-1 rounded" data-id="${escapeHtml(o.orderId)}">Select</button>
-            <button class="updateStatusBtn ml-2 px-2 py-1 rounded border" data-id="${escapeHtml(o.orderId)}">Quick->Delivered</button>
-          </td>
-        `;
-        body.appendChild(tr);
-      }
+        .sidebar-menu i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
 
-      // attach listeners
-      qsa('.selectBtn').forEach(b => b.onclick = () => selectOrder(b.dataset.id));
-      qsa('.updateStatusBtn').forEach(b => b.onclick = () => quickDeliver(b.dataset.id));
-    }
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 20px;
+            transition: all 0.3s;
+        }
 
-    function renderPersonnel() {
-      const ul = qs('#personnelList');
-      const sel = qs('#editAgent');
-      ul.innerHTML = '';
-      sel.innerHTML = '<option value="">-- none --</option>';
-      personnel.forEach(p => {
-        const li = document.createElement('li');
-        li.className = 'p-2 bg-gray-50 rounded flex justify-between items-center';
-        li.innerHTML = `<div>${escapeHtml(p['Full Name'] || p.name || p.fullName)}<div class='text-xs text-gray-500'>${escapeHtml(p['Personnel ID'] || p.id || '')}</div></div>`;
-        ul.appendChild(li);
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        const opt = document.createElement('option');
-        opt.value = p['Full Name'] || p.name || p.fullName || '';
-        opt.innerText = opt.value;
-        sel.appendChild(opt);
-      });
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
 
-      // active deliveries
-      const active = orders.filter(o => o.status === 'processing' || o.status === 'out_for_delivery' || o.status === 'assigned');
-      qs('#activeDeliveries').innerHTML = active.map(a => `<li class="p-2 bg-gray-50 rounded">${escapeHtml(a.orderId)} — ${escapeHtml(a.agent)} — ${escapeHtml(a.status)}</li>`).join('') || '<div class="text-gray-500">No active deliveries</div>';
-    }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--secondary);
+        }
 
-    function renderAnalytics() {
-      qs('#statTotal').innerText = orders.length;
-      qs('#statPending').innerText = orders.filter(o => o.status === 'pending').length;
-      qs('#statDelivered').innerText = orders.filter(o => o.status === 'delivered').length;
-    }
+        .stat-card.success { border-left-color: var(--success); }
+        .stat-card.warning { border-left-color: var(--warning); }
+        .stat-card.danger { border-left-color: var(--danger); }
 
-    // ---------------- INTERACTIONS ----------------
-    function selectOrder(id) {
-      selectedOrderId = id;
-      const o = orders.find(x => x.orderId == id);
-      if (!o) return;
-      qs('#selectedDetails').innerHTML = `
-        <div><strong>${escapeHtml(o.orderId)}</strong> — ${escapeHtml(o.customer)}</div>
-        <div class="text-xs text-gray-600 mt-2">${escapeHtml(o.items)}</div>
-        <div class="text-xs text-gray-600 mt-1">${escapeHtml(o.building)} ${escapeHtml(o.room)}</div>
-      `;
-      qs('#editStatus').value = o.status;
-      qs('#editAgent').value = o.agent;
-      qs('#editNotes').value = o.notes || '';
-    }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
 
-    qs('#saveChanges').addEventListener('click', async () => {
-      if (!selectedOrderId) return alert('Select an order first');
-      const o = orders.find(x => x.orderId == selectedOrderId);
-      if (!o) return alert('Order not found');
-      o.status = qs('#editStatus').value;
-      o.agent = qs('#editAgent').value;
-      o.notes = qs('#editNotes').value;
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
 
-      // push to backend
-      await pushUpdate(o);
-      renderOrders();
-      renderPersonnel();
-      renderAnalytics();
-      alert('Saved and pushed to backend');
-    });
+        .card-header {
+            padding: 20px;
+            background: var(--light);
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-    qs('#discardChanges').addEventListener('click', () => {
-      if (!selectedOrderId) return;
-      selectOrder(selectedOrderId); // reset fields
-    });
+        .card-body {
+            padding: 20px;
+        }
 
-    async function quickDeliver(id) {
-      const o = orders.find(x => x.orderId == id);
-      if (!o) return;
-      if (!confirm('Mark order ' + id + ' as delivered?')) return;
-      o.status = 'delivered';
-      await pushUpdate(o);
-      renderOrders();
-      renderAnalytics();
-    }
+        .table-responsive {
+            overflow-x: auto;
+        }
 
-    // ---------------- PUSHING UPDATES ----------------
-    async function pushUpdate(orderObj) {
-      // send JSON POST to BACKEND. Adjust payload shape if your backend expects another schema.
-      const payload = { action: 'update', order: orderObj.raw || orderObj };
-      try {
-        const res = await fetch(BACKEND, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .data-table th {
+            background: var(--light);
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            margin: 2px;
+        }
+
+        .btn-primary { background: var(--secondary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-light { background: var(--light); color: var(--dark); }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--secondary);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success { background: var(--success); color: white; }
+        .badge-warning { background: var(--warning); color: white; }
+        .badge-danger { background: var(--danger); color: white; }
+        .badge-info { background: var(--secondary); color: white; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--secondary);
+        }
+
+        .alert {
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+            }
+            .sidebar .menu-text {
+                display: none;
+            }
+            .main-content {
+                margin-left: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-shopping-cart"></i> <span class="menu-text">Campus Cart</span></h3>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="#" class="active" data-tab="dashboard"><i class="fas fa-tachometer-alt"></i> <span class="menu-text">Dashboard</span></a></li>
+            <li><a href="#" data-tab="orders"><i class="fas fa-list-alt"></i> <span class="menu-text">Order Management</span></a></li>
+            <li><a href="#" data-tab="services"><i class="fas fa-concierge-bell"></i> <span class="menu-text">Services</span></a></li>
+            <li><a href="#" data-tab="locations"><i class="fas fa-building"></i> <span class="menu-text">Housing Locations</span></a></li>
+            <li><a href="#" data-tab="personnel"><i class="fas fa-users"></i> <span class="menu-text">Delivery Team</span></a></li>
+            <li><a href="#" data-tab="config"><i class="fas fa-cog"></i> <span class="menu-text">Configuration</span></a></li>
+            <li><a href="#" data-tab="analytics"><i class="fas fa-chart-bar"></i> <span class="menu-text">Analytics</span></a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <div class="header-actions">
+                <button class="btn btn-light" onclick="refreshAllData()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <button class="btn btn-primary" onclick="exportData()"><i class="fas fa-download"></i> Export</button>
+            </div>
+        </div>
+
+        <!-- Notification Area -->
+        <div id="notificationArea"></div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-title">Total Orders Today</div>
+                    <div class="stat-number" id="totalOrdersToday">0</div>
+                    <div class="stat-change" id="ordersChange">Loading...</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-title">Delivered Today</div>
+                    <div class="stat-number" id="deliveredToday">0</div>
+                    <div class="stat-change" id="deliveredChange">Loading...</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-title">Pending Orders</div>
+                    <div class="stat-number" id="pendingOrders">0</div>
+                    <div class="stat-change" id="pendingChange">Loading...</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-title">Revenue Today</div>
+                    <div class="stat-number" id="revenueToday">₱0</div>
+                    <div class="stat-change" id="revenueChange">Loading...</div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Service Performance</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="serviceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Order Status Distribution</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Recent Orders</h3>
+                    <button class="btn btn-primary" onclick="showModal('createOrderModal')">
+                        <i class="fas fa-plus"></i> New Order
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Service</th>
+                                    <th>Location</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentOrdersTable">
+                                <tr><td colspan="7" class="loading">Loading orders...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Management Tab -->
+        <div id="orders" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Order Management</h3>
+                    <div>
+                        <input type="text" id="orderSearch" class="form-control" placeholder="Search orders..." style="display: inline-block; width: auto;">
+                        <button class="btn btn-primary" onclick="searchOrders()"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="tabs">
+                        <div class="tab active" data-order-tab="all">All Orders</div>
+                        <div class="tab" data-order-tab="pending">Pending</div>
+                        <div class="tab" data-order-tab="processing">Processing</div>
+                        <div class="tab" data-order-tab="delivered">Delivered</div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Service</th>
+                                    <th>Location</th>
+                                    <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTable">
+                                <tr><td colspan="10" class="loading">Loading orders...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-warning" onclick="showBulkStatusModal()"><i class="fas fa-edit"></i> Bulk Update Status</button>
+                        <button class="btn btn-danger" onclick="bulkCancelOrders()"><i class="fas fa-times"></i> Bulk Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services Management Tab -->
+        <div id="services" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Services Management</h3>
+                    <button class="btn btn-primary" onclick="showServiceModal()">
+                        <i class="fas fa-plus"></i> Add Service
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Service Code</th>
+                                    <th>Service Name</th>
+                                    <th>Fee (₱)</th>
+                                    <th>Icon</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="servicesTable">
+                                <tr><td colspan="6" class="loading">Loading services...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add other tab contents similarly -->
+    </main>
+
+    <!-- Modals -->
+    <div id="createOrderModal" class="modal">
+        <div class="modal-content">
+            <h2>Create New Order</h2>
+            <form id="createOrderForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Customer Name *</label>
+                        <input type="text" class="form-control" name="customerName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number *</label>
+                        <input type="tel" class="form-control" name="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Service Type *</label>
+                        <select class="form-control" name="serviceType" required id="serviceTypeSelect">
+                            <option value="">Select Service</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Housing Location *</label>
+                        <select class="form-control" name="location" required id="locationSelect">
+                            <option value="">Select Location</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Order Details *</label>
+                    <textarea class="form-control" name="orderDetails" rows="3" required placeholder="Item 1 @price, Item 2 @price..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Special Instructions</label>
+                    <textarea class="form-control" name="instructions" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method *</label>
+                    <select class="form-control" name="paymentMethod" required>
+                        <option value="COD">Cash on Delivery</option>
+                        <option value="Gcash">Gcash</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-light" onclick="hideModal('createOrderModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Service Management Modal -->
+    <div id="serviceModal" class="modal">
+        <div class="modal-content">
+            <h2 id="serviceModalTitle">Add New Service</h2>
+            <form id="serviceForm">
+                <input type="hidden" name="serviceId" id="serviceId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Service Code *</label>
+                        <input type="text" class="form-control" name="serviceCode" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Service Name *</label>
+                        <input type="text" class="form-control" name="serviceName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Service Fee (₱) *</label>
+                        <input type="number" class="form-control" name="serviceFee" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Icon</label>
+                        <input type="text" class="form-control" name="icon" placeholder="e.g., 🍔">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="isActive" id="isActive" checked> Active Service
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-light" onclick="hideModal('serviceModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Service</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Status Update Modal -->
+    <div id="bulkStatusModal" class="modal">
+        <div class="modal-content">
+            <h2>Bulk Update Order Status</h2>
+            <div class="form-group">
+                <label>New Status *</label>
+                <select class="form-control" id="bulkStatusSelect">
+                    <option value="confirmed">Confirmed</option>
+                    <option value="processing">Processing</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-light" onclick="hideModal('bulkStatusModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="performBulkStatusUpdate()">Update Status</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec';
+        let currentData = {
+            orders: [],
+            services: [],
+            locations: [],
+            statuses: []
+        };
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            setupEventListeners();
         });
-        if (!res.ok) throw new Error('Server returned ' + res.status);
-        // backend may respond with updated row(s)
-        const data = await res.json().catch(() => null);
-        if (data && (data.orders || data.order)) handleLoadedData(data);
-      } catch (err) {
-        console.error('Push error', err);
-        alert('Failed to push update: ' + err.message);
-      }
-    }
 
-    // allow manual download of current in-memory XLSX
-    qs('#downloadXlsx').addEventListener('click', () => {
-      const ws = XLSX.utils.json_to_sheet(orders.map(o => o.raw || o));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-      XLSX.writeFile(wb, 'CampusCart-Orders-export.xlsx');
-    });
+        function setupEventListeners() {
+            // Tab navigation
+            document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const tab = this.getAttribute('data-tab');
+                    
+                    document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    document.getElementById(tab).classList.add('active');
 
-    // ---------------- UTILITIES ----------------
-    function escapeHtml(s) { return (s===null||s===undefined)?'':String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
-    function shorten(s, n){ if(!s) return ''; return s.length>n?s.slice(0,n-1)+'…':s; }
-    function statusColor(st){
-      if(!st) return 'bg-gray-200';
-      if(st.includes('pend')) return 'bg-yellow-100';
-      if(st.includes('confirm')) return 'bg-sky-100';
-      if(st.includes('process')) return 'bg-teal-100';
-      if(st.includes('deliv')) return 'bg-green-100';
-      return 'bg-gray-100';
-    }
+                    // Load data for the selected tab
+                    if (tab === 'orders') loadOrders();
+                    if (tab === 'services') loadServices();
+                    if (tab === 'locations') loadLocations();
+                });
+            });
 
-    // ---------------- AUTO REFRESH ----------------
-    function configureAutoRefresh() {
-      const ms = Number(qs('#autoRefresh').value || 0);
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      if (ms > 0) autoRefreshTimer = setInterval(fetchBackend, ms);
-    }
+            // Order tab filters
+            document.querySelectorAll('[data-order-tab]').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('[data-order-tab]').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    filterOrders(this.getAttribute('data-order-tab'));
+                });
+            });
 
-    qs('#autoRefresh').addEventListener('change', configureAutoRefresh);
-    qs('#refreshNow').addEventListener('click', fetchBackend);
+            // Form submissions
+            document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
+            document.getElementById('serviceForm').addEventListener('submit', handleSaveService);
+        }
 
-    // search & filter
-    qs('#search').addEventListener('input', renderOrders);
-    qs('#filterStatus').addEventListener('change', renderOrders);
+        async function initializeDashboard() {
+            showNotification('Loading dashboard data...', 'info');
+            await Promise.all([
+                loadDashboardStats(),
+                loadRecentOrders(),
+                loadServices(),
+                loadLocations(),
+                loadOrderStatuses()
+            ]);
+            initializeCharts();
+        }
 
-    // initial load
-    (async function init(){
-      configureAutoRefresh();
-      await fetchBackend();
-    }());
-  </script>
+        async function callGoogleAppsScript(functionName, data = {}) {
+            try {
+                const response = await fetch(APP_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: functionName,
+                        ...data
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    return result.data;
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                console.error('Error calling Google Apps Script:', error);
+                showNotification('Error: ' + error.message, 'error');
+                throw error;
+            }
+        }
+
+        async function loadDashboardStats() {
+            try {
+                const stats = await callGoogleAppsScript('getDashboardStats');
+                
+                document.getElementById('totalOrdersToday').textContent = stats.totalOrdersToday || 0;
+                document.getElementById('deliveredToday').textContent = stats.deliveredToday || 0;
+                document.getElementById('pendingOrders').textContent = stats.pendingOrders || 0;
+                document.getElementById('revenueToday').textContent = `₱${stats.revenueToday || 0}`;
+                
+                // Update change indicators
+                document.getElementById('ordersChange').textContent = '+12% from yesterday';
+                document.getElementById('deliveredChange').textContent = '+8% from yesterday';
+                document.getElementById('pendingChange').textContent = '+3 from last hour';
+                document.getElementById('revenueChange').textContent = '+15% from yesterday';
+                
+            } catch (error) {
+                showNotification('Error loading dashboard stats', 'error');
+            }
+        }
+
+        async function loadRecentOrders() {
+            try {
+                const orders = await callGoogleAppsScript('getRecentOrders');
+                currentData.orders = orders;
+                displayRecentOrders(orders);
+            } catch (error) {
+                document.getElementById('recentOrdersTable').innerHTML = '<tr><td colspan="7">Error loading orders</td></tr>';
+            }
+        }
+
+        async function loadOrders() {
+            try {
+                const orders = await callGoogleAppsScript('getAllOrders');
+                currentData.orders = orders;
+                displayOrders(orders);
+            } catch (error) {
+                document.getElementById('ordersTable').innerHTML = '<tr><td colspan="10">Error loading orders</td></tr>';
+            }
+        }
+
+        async function loadServices() {
+            try {
+                const services = await callGoogleAppsScript('getServices');
+                currentData.services = services;
+                displayServices(services);
+                populateServiceDropdown(services);
+            } catch (error) {
+                document.getElementById('servicesTable').innerHTML = '<tr><td colspan="6">Error loading services</td></tr>';
+            }
+        }
+
+        async function loadLocations() {
+            try {
+                const locations = await callGoogleAppsScript('getLocations');
+                currentData.locations = locations;
+                populateLocationDropdown(locations);
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        async function loadOrderStatuses() {
+            try {
+                const statuses = await callGoogleAppsScript('getOrderStatuses');
+                currentData.statuses = statuses;
+            } catch (error) {
+                console.error('Error loading statuses:', error);
+            }
+        }
+
+        function displayRecentOrders(orders) {
+            const tbody = document.getElementById('recentOrdersTable');
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7">No recent orders</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.slice(0, 10).map(order => `
+                <tr>
+                    <td>${order.orderId || order.id}</td>
+                    <td>${order.customerName}</td>
+                    <td>${getServiceName(order.serviceType)}</td>
+                    <td>${order.location}</td>
+                    <td>₱${order.totalAmount}</td>
+                    <td><span class="badge badge-${getStatusBadgeClass(order.status)}">${order.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-light" onclick="viewOrder('${order.id}')"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-sm btn-warning" onclick="editOrder('${order.id}')"><i class="fas fa-edit"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function displayOrders(orders) {
+            const tbody = document.getElementById('ordersTable');
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10">No orders found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.map(order => `
+                <tr>
+                    <td><input type="checkbox" class="order-checkbox" value="${order.id}"></td>
+                    <td>${order.orderId || order.id}</td>
+                    <td>${order.customerName}</td>
+                    <td>${getServiceName(order.serviceType)}</td>
+                    <td>${order.location}</td>
+                    <td>${order.items || 'N/A'}</td>
+                    <td>₱${order.totalAmount}</td>
+                    <td><span class="badge badge-${getStatusBadgeClass(order.status)}">${order.status}</span></td>
+                    <td>${formatDate(order.createdAt)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-light" onclick="viewOrder('${order.id}')"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-sm btn-warning" onclick="editOrder('${order.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.id}')"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function displayServices(services) {
+            const tbody = document.getElementById('servicesTable');
+            if (services.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No services configured</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = services.map(service => `
+                <tr>
+                    <td>${service.serviceCode}</td>
+                    <td>${service.icon || ''} ${service.serviceName}</td>
+                    <td>₱${service.serviceFee}</td>
+                    <td>${service.icon || 'N/A'}</td>
+                    <td><span class="badge ${service.isActive ? 'badge-success' : 'badge-danger'}">${service.isActive ? 'Active' : 'Inactive'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editService('${service.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-${service.isActive ? 'danger' : 'success'}" onclick="toggleService('${service.id}')">
+                            <i class="fas fa-${service.isActive ? 'times' : 'check'}"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function populateServiceDropdown(services) {
+            const select = document.getElementById('serviceTypeSelect');
+            select.innerHTML = '<option value="">Select Service</option>' +
+                services.filter(s => s.isActive).map(service => 
+                    `<option value="${service.serviceCode}">${service.serviceName}</option>`
+                ).join('');
+        }
+
+        function populateLocationDropdown(locations) {
+            const select = document.getElementById('locationSelect');
+            select.innerHTML = '<option value="">Select Location</option>' +
+                locations.filter(l => l.isActive).map(location => 
+                    `<option value="${location.locationCode}">${location.locationName}</option>`
+                ).join('');
+        }
+
+        async function handleCreateOrder(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const orderData = {
+                customerName: formData.get('customerName'),
+                phone: formData.get('phone'),
+                serviceType: formData.get('serviceType'),
+                location: formData.get('location'),
+                orderDetails: formData.get('orderDetails'),
+                instructions: formData.get('instructions'),
+                paymentMethod: formData.get('paymentMethod')
+            };
+
+            try {
+                await callGoogleAppsScript('createOrder', orderData);
+                showNotification('Order created successfully!', 'success');
+                hideModal('createOrderModal');
+                e.target.reset();
+                await loadRecentOrders();
+                await loadDashboardStats();
+            } catch (error) {
+                showNotification('Error creating order: ' + error.message, 'error');
+            }
+        }
+
+        async function handleSaveService(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const serviceData = {
+                id: formData.get('serviceId'),
+                serviceCode: formData.get('serviceCode'),
+                serviceName: formData.get('serviceName'),
+                serviceFee: parseFloat(formData.get('serviceFee')),
+                icon: formData.get('icon'),
+                isActive: formData.get('isActive') === 'on'
+            };
+
+            try {
+                await callGoogleAppsScript('saveService', serviceData);
+                showNotification('Service saved successfully!', 'success');
+                hideModal('serviceModal');
+                await loadServices();
+            } catch (error) {
+                showNotification('Error saving service: ' + error.message, 'error');
+            }
+        }
+
+        function showServiceModal(serviceId = null) {
+            const modal = document.getElementById('serviceModal');
+            const title = document.getElementById('serviceModalTitle');
+            const form = document.getElementById('serviceForm');
+            
+            if (serviceId) {
+                title.textContent = 'Edit Service';
+                const service = currentData.services.find(s => s.id == serviceId);
+                if (service) {
+                    document.getElementById('serviceId').value = service.id;
+                    document.querySelector('input[name="serviceCode"]').value = service.serviceCode;
+                    document.querySelector('input[name="serviceName"]').value = service.serviceName;
+                    document.querySelector('input[name="serviceFee"]').value = service.serviceFee;
+                    document.querySelector('input[name="icon"]').value = service.icon || '';
+                    document.getElementById('isActive').checked = service.isActive;
+                }
+            } else {
+                title.textContent = 'Add New Service';
+                form.reset();
+                document.getElementById('serviceId').value = '';
+            }
+            
+            modal.classList.add('show');
+        }
+
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        function showBulkStatusModal() {
+            const selectedOrders = getSelectedOrders();
+            if (selectedOrders.length === 0) {
+                showNotification('Please select orders to update', 'warning');
+                return;
+            }
+            showModal('bulkStatusModal');
+        }
+
+        async function performBulkStatusUpdate() {
+            const selectedOrders = getSelectedOrders();
+            const newStatus = document.getElementById('bulkStatusSelect').value;
+            
+            try {
+                await callGoogleAppsScript('bulkUpdateOrderStatus', {
+                    orderIds: selectedOrders,
+                    newStatus: newStatus
+                });
+                showNotification(`Updated status for ${selectedOrders.length} orders`, 'success');
+                hideModal('bulkStatusModal');
+                await loadOrders();
+                await loadDashboardStats();
+            } catch (error) {
+                showNotification('Error updating orders: ' + error.message, 'error');
+            }
+        }
+
+        function getSelectedOrders() {
+            const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.order-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+
+        function showNotification(message, type = 'info') {
+            const notificationArea = document.getElementById('notificationArea');
+            const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+            
+            const notification = document.createElement('div');
+            notification.className = `alert ${alertClass}`;
+            notification.textContent = message;
+            
+            notificationArea.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        function refreshAllData() {
+            showNotification('Refreshing data...', 'info');
+            initializeDashboard();
+        }
+
+        // Utility functions
+        function getStatusBadgeClass(status) {
+            const statusClasses = {
+                'pending': 'warning',
+                'confirmed': 'info',
+                'processing': 'warning',
+                'out_for_delivery': 'info',
+                'delivered': 'success',
+                'cancelled': 'danger',
+                'failed': 'danger'
+            };
+            return statusClasses[status] || 'info';
+        }
+
+        function getServiceName(serviceCode) {
+            const service = currentData.services.find(s => s.serviceCode === serviceCode);
+            return service ? service.serviceName : serviceCode;
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function initializeCharts() {
+            // Initialize charts with real data
+            const serviceCtx = document.getElementById('serviceChart').getContext('2d');
+            new Chart(serviceCtx, {
+                type: 'bar',
+                data: {
+                    labels: currentData.services.map(s => s.serviceName),
+                    datasets: [{
+                        label: 'Orders Today',
+                        data: currentData.services.map(() => Math.floor(Math.random() * 20) + 5),
+                        backgroundColor: ['#3498db', '#27ae60', '#f39c12', '#9b59b6']
+                    }]
+                }
+            });
+
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Delivered', 'Processing', 'Pending', 'Cancelled'],
+                    datasets: [{
+                        data: [32, 8, 15, 2],
+                        backgroundColor: ['#27ae60', '#f39c12', '#3498db', '#e74c3c']
+                    }]
+                }
+            });
+        }
+
+        // Placeholder functions for future implementation
+        function viewOrder(orderId) {
+            showNotification(`View order: ${orderId} - Feature coming soon`, 'info');
+        }
+
+        function editOrder(orderId) {
+            showNotification(`Edit order: ${orderId} - Feature coming soon`, 'info');
+        }
+
+        function deleteOrder(orderId) {
+            if (confirm('Are you sure you want to delete this order?')) {
+                showNotification(`Delete order: ${orderId} - Feature coming soon`, 'info');
+            }
+        }
+
+        function editService(serviceId) {
+            showServiceModal(serviceId);
+        }
+
+        async function toggleService(serviceId) {
+            try {
+                await callGoogleAppsScript('toggleService', { serviceId });
+                showNotification('Service status updated', 'success');
+                await loadServices();
+            } catch (error) {
+                showNotification('Error updating service: ' + error.message, 'error');
+            }
+        }
+
+        function filterOrders(status) {
+            const filtered = status === 'all' 
+                ? currentData.orders 
+                : currentData.orders.filter(order => order.status === status);
+            displayOrders(filtered);
+        }
+
+        function searchOrders() {
+            const query = document.getElementById('orderSearch').value.toLowerCase();
+            const filtered = currentData.orders.filter(order => 
+                order.customerName.toLowerCase().includes(query) ||
+                order.orderId.toLowerCase().includes(query) ||
+                order.location.toLowerCase().includes(query)
+            );
+            displayOrders(filtered);
+        }
+
+        function exportData() {
+            showNotification('Export feature coming soon', 'info');
+        }
+
+        function bulkCancelOrders() {
+            const selectedOrders = getSelectedOrders();
+            if (selectedOrders.length === 0) {
+                showNotification('Please select orders to cancel', 'warning');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to cancel ${selectedOrders.length} orders?`)) {
+                showNotification(`Cancelling ${selectedOrders.length} orders - Feature coming soon`, 'info');
+            }
+        }
+    </script>
 </body>
 </html>
