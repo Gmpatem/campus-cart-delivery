@@ -499,7 +499,53 @@
             </div>
         </div>
 
-        <!-- Add other tab contents similarly -->
+        <!-- Locations Tab -->
+        <div id="locations" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Housing Locations</h3>
+                </div>
+                <div class="card-body">
+                    <p>Location management coming soon...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personnel Tab -->
+        <div id="personnel" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Delivery Team</h3>
+                </div>
+                <div class="card-body">
+                    <p>Personnel management coming soon...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config Tab -->
+        <div id="config" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>System Configuration</h3>
+                </div>
+                <div class="card-body">
+                    <p>Configuration settings coming soon...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Analytics & Reports</h3>
+                </div>
+                <div class="card-body">
+                    <p>Analytics coming soon...</p>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Modals -->
@@ -611,7 +657,9 @@
     </div>
 
     <script>
-        const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfbPcP0CQwlwkszBa8RuJwcLCsT4NW6XBb4tYKQK9j4YorZEeRFyoqnTSzZr4Oh-C3/exec';
+        // UPDATED: Use your new deployment URL
+        const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw5_JynTb7EJ1fuq_9dpCKHqV5dgPovfMvCm0-9i2LwWBGegY-FkbozpJ2-bpIzmuXV/exec';
+        
         let currentData = {
             orders: [],
             services: [],
@@ -661,14 +709,17 @@
 
         async function initializeDashboard() {
             showNotification('Loading dashboard data...', 'info');
-            await Promise.all([
-                loadDashboardStats(),
-                loadRecentOrders(),
-                loadServices(),
-                loadLocations(),
-                loadOrderStatuses()
-            ]);
-            initializeCharts();
+            try {
+                await Promise.all([
+                    loadDashboardStats(),
+                    loadRecentOrders(),
+                    loadServices(),
+                    loadLocations()
+                ]);
+                initializeCharts();
+            } catch (error) {
+                console.error('Dashboard initialization error:', error);
+            }
         }
 
         async function callGoogleAppsScript(functionName, data = {}) {
@@ -684,11 +735,16 @@
                     })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const result = await response.json();
+                
                 if (result.success) {
-                    return result.data;
+                    return result.data || result;
                 } else {
-                    throw new Error(result.error || 'Unknown error occurred');
+                    throw new Error(result.message || 'Unknown error occurred');
                 }
             } catch (error) {
                 console.error('Error calling Google Apps Script:', error);
@@ -699,7 +755,8 @@
 
         async function loadDashboardStats() {
             try {
-                const stats = await callGoogleAppsScript('getDashboardStats');
+                const data = await callGoogleAppsScript('getDashboardStats');
+                const stats = data.stats || data;
                 
                 document.getElementById('totalOrdersToday').textContent = stats.totalOrdersToday || 0;
                 document.getElementById('deliveredToday').textContent = stats.deliveredToday || 0;
@@ -707,50 +764,58 @@
                 document.getElementById('revenueToday').textContent = `₱${stats.revenueToday || 0}`;
                 
                 // Update change indicators
-                document.getElementById('ordersChange').textContent = '+12% from yesterday';
-                document.getElementById('deliveredChange').textContent = '+8% from yesterday';
-                document.getElementById('pendingChange').textContent = '+3 from last hour';
-                document.getElementById('revenueChange').textContent = '+15% from yesterday';
+                document.getElementById('ordersChange').textContent = 'Updated';
+                document.getElementById('deliveredChange').textContent = 'Updated';
+                document.getElementById('pendingChange').textContent = 'Updated';
+                document.getElementById('revenueChange').textContent = 'Updated';
                 
             } catch (error) {
+                console.error('Error loading dashboard stats:', error);
                 showNotification('Error loading dashboard stats', 'error');
             }
         }
 
         async function loadRecentOrders() {
             try {
-                const orders = await callGoogleAppsScript('getRecentOrders');
+                const data = await callGoogleAppsScript('getRecentOrders');
+                const orders = data.orders || data || [];
                 currentData.orders = orders;
                 displayRecentOrders(orders);
             } catch (error) {
+                console.error('Error loading recent orders:', error);
                 document.getElementById('recentOrdersTable').innerHTML = '<tr><td colspan="7">Error loading orders</td></tr>';
             }
         }
 
         async function loadOrders() {
             try {
-                const orders = await callGoogleAppsScript('getAllOrders');
+                const data = await callGoogleAppsScript('getAllOrders');
+                const orders = data.orders || data || [];
                 currentData.orders = orders;
                 displayOrders(orders);
             } catch (error) {
+                console.error('Error loading orders:', error);
                 document.getElementById('ordersTable').innerHTML = '<tr><td colspan="10">Error loading orders</td></tr>';
             }
         }
 
         async function loadServices() {
             try {
-                const services = await callGoogleAppsScript('getServices');
+                const data = await callGoogleAppsScript('getServices');
+                const services = data.services || data || [];
                 currentData.services = services;
                 displayServices(services);
                 populateServiceDropdown(services);
             } catch (error) {
+                console.error('Error loading services:', error);
                 document.getElementById('servicesTable').innerHTML = '<tr><td colspan="6">Error loading services</td></tr>';
             }
         }
 
         async function loadLocations() {
             try {
-                const locations = await callGoogleAppsScript('getLocations');
+                const data = await callGoogleAppsScript('getLocations');
+                const locations = data.locations || data || [];
                 currentData.locations = locations;
                 populateLocationDropdown(locations);
             } catch (error) {
@@ -758,30 +823,21 @@
             }
         }
 
-        async function loadOrderStatuses() {
-            try {
-                const statuses = await callGoogleAppsScript('getOrderStatuses');
-                currentData.statuses = statuses;
-            } catch (error) {
-                console.error('Error loading statuses:', error);
-            }
-        }
-
         function displayRecentOrders(orders) {
             const tbody = document.getElementById('recentOrdersTable');
-            if (orders.length === 0) {
+            if (!orders || orders.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7">No recent orders</td></tr>';
                 return;
             }
 
             tbody.innerHTML = orders.slice(0, 10).map(order => `
                 <tr>
-                    <td>${order.orderId || order.id}</td>
-                    <td>${order.customerName}</td>
-                    <td>${getServiceName(order.serviceType)}</td>
-                    <td>${order.location}</td>
-                    <td>₱${order.totalAmount}</td>
-                    <td><span class="badge badge-${getStatusBadgeClass(order.status)}">${order.status}</span></td>
+                    <td>${order['Order Code'] || order.orderId || order.id || 'N/A'}</td>
+                    <td>${order['Customer Name'] || order.customerName || 'N/A'}</td>
+                    <td>${getServiceName(order['Service Code'] || order.serviceType)}</td>
+                    <td>${order['Housing Location'] || order.location || 'N/A'}</td>
+                    <td>₱${order['Grand Total'] || order.totalAmount || 0}</td>
+                    <td><span class="badge badge-${getStatusBadgeClass(order.Status || order.status)}">${order.Status || order.status || 'pending'}</span></td>
                     <td>
                         <button class="btn btn-sm btn-light" onclick="viewOrder('${order.id}')"><i class="fas fa-eye"></i></button>
                         <button class="btn btn-sm btn-warning" onclick="editOrder('${order.id}')"><i class="fas fa-edit"></i></button>
@@ -792,26 +848,25 @@
 
         function displayOrders(orders) {
             const tbody = document.getElementById('ordersTable');
-            if (orders.length === 0) {
+            if (!orders || orders.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10">No orders found</td></tr>';
                 return;
             }
 
             tbody.innerHTML = orders.map(order => `
                 <tr>
-                    <td><input type="checkbox" class="order-checkbox" value="${order.id}"></td>
-                    <td>${order.orderId || order.id}</td>
-                    <td>${order.customerName}</td>
-                    <td>${getServiceName(order.serviceType)}</td>
-                    <td>${order.location}</td>
-                    <td>${order.items || 'N/A'}</td>
-                    <td>₱${order.totalAmount}</td>
-                    <td><span class="badge badge-${getStatusBadgeClass(order.status)}">${order.status}</span></td>
-                    <td>${formatDate(order.createdAt)}</td>
+                    <td><input type="checkbox" class="order-checkbox" value="${order['Order Code'] || order.id}"></td>
+                    <td>${order['Order Code'] || order.orderId || order.id || 'N/A'}</td>
+                    <td>${order['Customer Name'] || order.customerName || 'N/A'}</td>
+                    <td>${getServiceName(order['Service Code'] || order.serviceType)}</td>
+                    <td>${order['Housing Location'] || order.location || 'N/A'}</td>
+                    <td>${order.Items || order.items || 'N/A'}</td>
+                    <td>₱${order['Grand Total'] || order.totalAmount || 0}</td>
+                    <td><span class="badge badge-${getStatusBadgeClass(order.Status || order.status)}">${order.Status || order.status || 'pending'}</span></td>
+                    <td>${formatDate(order['Created At'] || order.createdAt)}</td>
                     <td>
                         <button class="btn btn-sm btn-light" onclick="viewOrder('${order.id}')"><i class="fas fa-eye"></i></button>
                         <button class="btn btn-sm btn-warning" onclick="editOrder('${order.id}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteOrder('${order.id}')"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             `).join('');
@@ -819,22 +874,22 @@
 
         function displayServices(services) {
             const tbody = document.getElementById('servicesTable');
-            if (services.length === 0) {
+            if (!services || services.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6">No services configured</td></tr>';
                 return;
             }
 
             tbody.innerHTML = services.map(service => `
                 <tr>
-                    <td>${service.serviceCode}</td>
-                    <td>${service.icon || ''} ${service.serviceName}</td>
-                    <td>₱${service.serviceFee}</td>
-                    <td>${service.icon || 'N/A'}</td>
-                    <td><span class="badge ${service.isActive ? 'badge-success' : 'badge-danger'}">${service.isActive ? 'Active' : 'Inactive'}</span></td>
+                    <td>${service['Service Code'] || service.serviceCode || 'N/A'}</td>
+                    <td>${service.Icon || service.icon || ''} ${service['Service Name'] || service.serviceName || 'N/A'}</td>
+                    <td>₱${service['Service Fee'] || service.serviceFee || 0}</td>
+                    <td>${service.Icon || service.icon || 'N/A'}</td>
+                    <td><span class="badge ${service['Is Active'] || service.isActive ? 'badge-success' : 'badge-danger'}">${service['Is Active'] || service.isActive ? 'Active' : 'Inactive'}</span></td>
                     <td>
-                        <button class="btn btn-sm btn-warning" onclick="editService('${service.id}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-${service.isActive ? 'danger' : 'success'}" onclick="toggleService('${service.id}')">
-                            <i class="fas fa-${service.isActive ? 'times' : 'check'}"></i>
+                        <button class="btn btn-sm btn-warning" onclick="editService('${service.ID || service.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-${service['Is Active'] || service.isActive ? 'danger' : 'success'}" onclick="toggleService('${service.ID || service.id}')">
+                            <i class="fas fa-${service['Is Active'] || service.isActive ? 'times' : 'check'}"></i>
                         </button>
                     </td>
                 </tr>
@@ -844,16 +899,16 @@
         function populateServiceDropdown(services) {
             const select = document.getElementById('serviceTypeSelect');
             select.innerHTML = '<option value="">Select Service</option>' +
-                services.filter(s => s.isActive).map(service => 
-                    `<option value="${service.serviceCode}">${service.serviceName}</option>`
+                services.filter(s => s['Is Active'] || s.isActive).map(service => 
+                    `<option value="${service['Service Code'] || service.serviceCode}">${service['Service Name'] || service.serviceName}</option>`
                 ).join('');
         }
 
         function populateLocationDropdown(locations) {
             const select = document.getElementById('locationSelect');
             select.innerHTML = '<option value="">Select Location</option>' +
-                locations.filter(l => l.isActive).map(location => 
-                    `<option value="${location.locationCode}">${location.locationName}</option>`
+                locations.filter(l => l['Is Active'] || l.isActive).map(location => 
+                    `<option value="${location['Location Code'] || location.locationCode}">${location['Location Name'] || location.locationName}</option>`
                 ).join('');
         }
 
@@ -911,14 +966,14 @@
             
             if (serviceId) {
                 title.textContent = 'Edit Service';
-                const service = currentData.services.find(s => s.id == serviceId);
+                const service = currentData.services.find(s => (s.ID || s.id) == serviceId);
                 if (service) {
-                    document.getElementById('serviceId').value = service.id;
-                    document.querySelector('input[name="serviceCode"]').value = service.serviceCode;
-                    document.querySelector('input[name="serviceName"]').value = service.serviceName;
-                    document.querySelector('input[name="serviceFee"]').value = service.serviceFee;
-                    document.querySelector('input[name="icon"]').value = service.icon || '';
-                    document.getElementById('isActive').checked = service.isActive;
+                    document.getElementById('serviceId').value = service.ID || service.id;
+                    document.querySelector('input[name="serviceCode"]').value = service['Service Code'] || service.serviceCode;
+                    document.querySelector('input[name="serviceName"]').value = service['Service Name'] || service.serviceName;
+                    document.querySelector('input[name="serviceFee"]').value = service['Service Fee'] || service.serviceFee;
+                    document.querySelector('input[name="icon"]').value = service.Icon || service.icon || '';
+                    document.getElementById('isActive').checked = service['Is Active'] || service.isActive;
                 }
             } else {
                 title.textContent = 'Add New Service';
@@ -1010,11 +1065,12 @@
         }
 
         function getServiceName(serviceCode) {
-            const service = currentData.services.find(s => s.serviceCode === serviceCode);
-            return service ? service.serviceName : serviceCode;
+            const service = currentData.services.find(s => (s['Service Code'] || s.serviceCode) === serviceCode);
+            return service ? (service['Service Name'] || service.serviceName) : serviceCode;
         }
 
         function formatDate(dateString) {
+            if (!dateString) return 'N/A';
             return new Date(dateString).toLocaleDateString();
         }
 
@@ -1024,7 +1080,7 @@
             new Chart(serviceCtx, {
                 type: 'bar',
                 data: {
-                    labels: currentData.services.map(s => s.serviceName),
+                    labels: currentData.services.map(s => s['Service Name'] || s.serviceName),
                     datasets: [{
                         label: 'Orders Today',
                         data: currentData.services.map(() => Math.floor(Math.random() * 20) + 5),
@@ -1055,12 +1111,6 @@
             showNotification(`Edit order: ${orderId} - Feature coming soon`, 'info');
         }
 
-        function deleteOrder(orderId) {
-            if (confirm('Are you sure you want to delete this order?')) {
-                showNotification(`Delete order: ${orderId} - Feature coming soon`, 'info');
-            }
-        }
-
         function editService(serviceId) {
             showServiceModal(serviceId);
         }
@@ -1078,16 +1128,16 @@
         function filterOrders(status) {
             const filtered = status === 'all' 
                 ? currentData.orders 
-                : currentData.orders.filter(order => order.status === status);
+                : currentData.orders.filter(order => (order.Status || order.status) === status);
             displayOrders(filtered);
         }
 
         function searchOrders() {
             const query = document.getElementById('orderSearch').value.toLowerCase();
             const filtered = currentData.orders.filter(order => 
-                order.customerName.toLowerCase().includes(query) ||
-                order.orderId.toLowerCase().includes(query) ||
-                order.location.toLowerCase().includes(query)
+                (order['Customer Name'] || order.customerName || '').toLowerCase().includes(query) ||
+                (order['Order Code'] || order.orderId || '').toLowerCase().includes(query) ||
+                (order['Housing Location'] || order.location || '').toLowerCase().includes(query)
             );
             displayOrders(filtered);
         }
