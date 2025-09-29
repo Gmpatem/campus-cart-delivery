@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Campus Cart — Unified Admin & Delivery Dashboard</title>
+  <!-- Tailwind via CDN for quick, clean styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS for parsing XLSX if backend returns binary XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    /* small extras beyond Tailwind */
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+    .chip { @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <header class="bg-sky-800 text-white p-4 shadow">
+    <div class="container mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold">Campus Cart — Unified Dashboard</h1>
+        <p class="text-sm opacity-80">Admin + Delivery in one interface</p>
+      </div>
+      <div class="space-x-3">
+        <button id="refreshNow" class="bg-white text-sky-800 px-3 py-1 rounded">Refresh</button>
+        <select id="autoRefresh" class="rounded px-2 py-1 text-sky-800">
+          <option value="0">Auto-refresh: Off</option>
+          <option value="15000">15s</option>
+          <option value="30000">30s</option>
+          <option value="60000" selected>60s</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mx-auto p-4">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="col-span-2">
+        <nav class="bg-white rounded p-3 shadow flex gap-2">
+          <button class="tabBtn px-3 py-2 rounded bg-sky-100 text-sky-800" data-tab="orders">Orders</button>
+          <button class="tabBtn px-3 py-2 rounded" data-tab="delivery">Delivery</button>
+          <button class="tabBtn px-3 py-2 rounded" data-tab="analytics">Analytics</button>
+          <button class="px-3 py-2 rounded ml-auto" id="downloadXlsx">Download XLSX</button>
+        </nav>
+
+        <!-- Orders table -->
+        <div id="orders" class="tabPanel mt-4 bg-white rounded shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold">Orders</h2>
+            <div class="flex gap-2 items-center">
+              <input id="search" placeholder="Search orders..." class="border rounded px-2 py-1" />
+              <select id="filterStatus" class="rounded px-2 py-1">
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="processing">Processing</option>
+                <option value="delivered">Delivered</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table id="ordersTable" class="min-w-full text-sm">
+              <thead class="bg-gray-100 text-left sticky top-0">
+                <tr>
+                  <th class="px-3 py-2">Order ID</th>
+                  <th class="px-3 py-2">Customer</th>
+                  <th class="px-3 py-2">Items</th>
+                  <th class="px-3 py-2">Total</th>
+                  <th class="px-3 py-2">Building / Room</th>
+                  <th class="px-3 py-2">Status</th>
+                  <th class="px-3 py-2">Delivery Agent</th>
+                  <th class="px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Delivery management -->
+        <div id="delivery" class="tabPanel hidden mt-4 bg-white rounded shadow p-4">
+          <h2 class="text-lg font-semibold mb-3">Delivery Management</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 class="font-medium">Available Personnel</h3>
+              <ul id="personnelList" class="mt-2 space-y-2"></ul>
+            </div>
+            <div>
+              <h3 class="font-medium">Active Deliveries</h3>
+              <ul id="activeDeliveries" class="mt-2 space-y-2"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytics -->
+        <div id="analytics" class="tabPanel hidden mt-4 bg-white rounded shadow p-4">
+          <h2 class="text-lg font-semibold">Quick Analytics</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+            <div class="p-3 bg-sky-50 rounded">Total orders: <span id="statTotal">0</span></div>
+            <div class="p-3 bg-sky-50 rounded">Pending: <span id="statPending">0</span></div>
+            <div class="p-3 bg-sky-50 rounded">Delivered: <span id="statDelivered">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column: details / editor -->
+      <aside class="bg-white rounded shadow p-4">
+        <h3 class="font-semibold">Selected Order</h3>
+        <div id="selectedDetails" class="mt-2 text-sm text-gray-700">No order selected</div>
+
+        <div class="mt-4">
+          <h4 class="font-medium">Edit / Update</h4>
+          <div class="space-y-2 mt-2">
+            <label class="block text-xs">Status</label>
+            <select id="editStatus" class="w-full rounded px-2 py-1 border">
+              <option value="pending">pending</option>
+              <option value="confirmed">confirmed</option>
+              <option value="processing">processing</option>
+              <option value="delivered">delivered</option>
+              <option value="failed">failed</option>
+            </select>
+
+            <label class="block text-xs">Assign Delivery Agent</label>
+            <select id="editAgent" class="w-full rounded px-2 py-1 border"><option value="">-- none --</option></select>
+
+            <label class="block text-xs">Notes</label>
+            <textarea id="editNotes" class="w-full rounded px-2 py-1 border" rows="3"></textarea>
+
+            <div class="flex gap-2 mt-2">
+              <button id="saveChanges" class="bg-sky-800 text-white px-3 py-1 rounded">Save & Push</button>
+              <button id="discardChanges" class="px-3 py-1 rounded border">Discard</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="text-xs text-gray-500 text-center mt-8">This dashboard will attempt to read XLSX or JSON from your backend and send updates back. Be sure your backend accepts JSON POSTs at the same endpoint.</footer>
+  </main>
+
+  <script>
+    // ---------------- CONFIG ----------------
+    const BACKEND = 'https://script.google.com/macros/s/AKfycbz2z1KGReW12lWXoq0CQEZAE7e-y1GP00-gxShi6HmZLG8uMs4En1InpymXyzMQkGxm/exec';
+    // If your backend expects a query param like ?action=downloadXlsx you can change the fetch call below.
+
+    // ---------------- STATE ----------------
+    let orders = []; // array of objects
+    let personnel = [];
+    let selectedOrderId = null;
+    let autoRefreshTimer = null;
+
+    // ---------------- UI HELPERS ----------------
+    const qs = sel => document.querySelector(sel);
+    const qsa = sel => Array.from(document.querySelectorAll(sel));
+
+    function setTab(name) {
+      qsa('.tabPanel').forEach(el => el.classList.add('hidden'));
+      qsa('.tabBtn').forEach(b => b.classList.remove('bg-sky-100', 'text-sky-800'));
+      qs(`[data-tab="${name}"]`).classList.add('bg-sky-100', 'text-sky-800');
+      qs('#' + name).classList.remove('hidden');
+    }
+
+    qsa('.tabBtn').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+    setTab('orders');
+
+    // ---------------- DATA FETCHING ----------------
+    async function fetchBackend() {
+      // Try to fetch JSON first
+      try {
+        const res = await fetch(BACKEND, { cache: 'no-store' });
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          const j = await res.json();
+          handleLoadedData(j);
+          return;
+        }
+
+        // If not JSON, try to treat as binary XLSX
+        const buf = await res.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        // assume first sheet contains orders
+        const firstSheet = wb.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { defval: '' });
+        handleLoadedData({orders: data});
+      } catch (err) {
+        console.error('Fetch error', err);
+        // show user-friendly message
+        qs('#ordersBody').innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-red-600">Unable to fetch backend: '+err.message+'</td></tr>';
+      }
+    }
+
+    function handleLoadedData(payload) {
+      // flexible: handle payload.orders or payload
+      let data = [];
+      if (Array.isArray(payload)) data = payload;
+      else if (Array.isArray(payload.orders)) data = payload.orders;
+      else if (Array.isArray(payload.data)) data = payload.data;
+      else console.warn('Unrecognized payload shape, attempting to use as array');
+
+      // attempt to detect personnel if provided
+      personnel = payload.personnel || [];
+      renderPersonnel();
+
+      // normalize orders
+      orders = data.map(row => normalizeRow(row));
+      renderOrders();
+      renderAnalytics();
+    }
+
+    function normalizeRow(row) {
+      // try to adapt common column names to our UI names
+      return {
+        orderId: row['Order ID'] || row.orderId || row.id || row['ID'] || (row['Order No'] || '')+'' ,
+        customer: row['Customer Name'] || row.customer || row.name || '',
+        items: row.Items || row.items || row['Item List'] || '',
+        total: row['Grand Total'] || row.total || row.amount || 0,
+        building: (row.Building || row.building || ''),
+        room: row.Room || row.room || '',
+        status: (row.Status || row.status || 'pending').toString().toLowerCase(),
+        agent: row['Delivery Agent'] || row.agent || '',
+        notes: row.Notes || row.notes || '' ,
+        raw: row
+      };
+    }
+
+    // ---------------- RENDERING ----------------
+    function renderOrders() {
+      const body = qs('#ordersBody');
+      const search = qs('#search').value.toLowerCase();
+      const statusFilter = qs('#filterStatus').value.toLowerCase();
+      body.innerHTML = '';
+
+      const filtered = orders.filter(o => {
+        if (statusFilter && o.status !== statusFilter) return false;
+        if (!search) return true;
+        return (o.orderId+' '+o.customer+' '+o.items+' '+o.agent+' '+o.building+' '+o.room).toLowerCase().includes(search);
+      });
+
+      if (filtered.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-gray-500">No orders found</td></tr>';
+        return;
+      }
+
+      for (const o of filtered) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b';
+        tr.innerHTML = `
+          <td class="px-3 py-2">${escapeHtml(o.orderId)}</td>
+          <td class="px-3 py-2">${escapeHtml(o.customer)}</td>
+          <td class="px-3 py-2">${escapeHtml(shorten(o.items, 70))}</td>
+          <td class="px-3 py-2">${escapeHtml(o.total)}</td>
+          <td class="px-3 py-2">${escapeHtml(o.building)} ${escapeHtml(o.room)}</td>
+          <td class="px-3 py-2"><span class="chip px-2 py-1 rounded ${statusColor(o.status)}">${escapeHtml(o.status)}</span></td>
+          <td class="px-3 py-2">${escapeHtml(o.agent)}</td>
+          <td class="px-3 py-2">
+            <button class="selectBtn bg-sky-600 text-white px-2 py-1 rounded" data-id="${escapeHtml(o.orderId)}">Select</button>
+            <button class="updateStatusBtn ml-2 px-2 py-1 rounded border" data-id="${escapeHtml(o.orderId)}">Quick->Delivered</button>
+          </td>
+        `;
+        body.appendChild(tr);
+      }
+
+      // attach listeners
+      qsa('.selectBtn').forEach(b => b.onclick = () => selectOrder(b.dataset.id));
+      qsa('.updateStatusBtn').forEach(b => b.onclick = () => quickDeliver(b.dataset.id));
+    }
+
+    function renderPersonnel() {
+      const ul = qs('#personnelList');
+      const sel = qs('#editAgent');
+      ul.innerHTML = '';
+      sel.innerHTML = '<option value="">-- none --</option>';
+      personnel.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'p-2 bg-gray-50 rounded flex justify-between items-center';
+        li.innerHTML = `<div>${escapeHtml(p['Full Name'] || p.name || p.fullName)}<div class='text-xs text-gray-500'>${escapeHtml(p['Personnel ID'] || p.id || '')}</div></div>`;
+        ul.appendChild(li);
+
+        const opt = document.createElement('option');
+        opt.value = p['Full Name'] || p.name || p.fullName || '';
+        opt.innerText = opt.value;
+        sel.appendChild(opt);
+      });
+
+      // active deliveries
+      const active = orders.filter(o => o.status === 'processing' || o.status === 'out_for_delivery' || o.status === 'assigned');
+      qs('#activeDeliveries').innerHTML = active.map(a => `<li class="p-2 bg-gray-50 rounded">${escapeHtml(a.orderId)} — ${escapeHtml(a.agent)} — ${escapeHtml(a.status)}</li>`).join('') || '<div class="text-gray-500">No active deliveries</div>';
+    }
+
+    function renderAnalytics() {
+      qs('#statTotal').innerText = orders.length;
+      qs('#statPending').innerText = orders.filter(o => o.status === 'pending').length;
+      qs('#statDelivered').innerText = orders.filter(o => o.status === 'delivered').length;
+    }
+
+    // ---------------- INTERACTIONS ----------------
+    function selectOrder(id) {
+      selectedOrderId = id;
+      const o = orders.find(x => x.orderId == id);
+      if (!o) return;
+      qs('#selectedDetails').innerHTML = `
+        <div><strong>${escapeHtml(o.orderId)}</strong> — ${escapeHtml(o.customer)}</div>
+        <div class="text-xs text-gray-600 mt-2">${escapeHtml(o.items)}</div>
+        <div class="text-xs text-gray-600 mt-1">${escapeHtml(o.building)} ${escapeHtml(o.room)}</div>
+      `;
+      qs('#editStatus').value = o.status;
+      qs('#editAgent').value = o.agent;
+      qs('#editNotes').value = o.notes || '';
+    }
+
+    qs('#saveChanges').addEventListener('click', async () => {
+      if (!selectedOrderId) return alert('Select an order first');
+      const o = orders.find(x => x.orderId == selectedOrderId);
+      if (!o) return alert('Order not found');
+      o.status = qs('#editStatus').value;
+      o.agent = qs('#editAgent').value;
+      o.notes = qs('#editNotes').value;
+
+      // push to backend
+      await pushUpdate(o);
+      renderOrders();
+      renderPersonnel();
+      renderAnalytics();
+      alert('Saved and pushed to backend');
+    });
+
+    qs('#discardChanges').addEventListener('click', () => {
+      if (!selectedOrderId) return;
+      selectOrder(selectedOrderId); // reset fields
+    });
+
+    async function quickDeliver(id) {
+      const o = orders.find(x => x.orderId == id);
+      if (!o) return;
+      if (!confirm('Mark order ' + id + ' as delivered?')) return;
+      o.status = 'delivered';
+      await pushUpdate(o);
+      renderOrders();
+      renderAnalytics();
+    }
+
+    // ---------------- PUSHING UPDATES ----------------
+    async function pushUpdate(orderObj) {
+      // send JSON POST to BACKEND. Adjust payload shape if your backend expects another schema.
+      const payload = { action: 'update', order: orderObj.raw || orderObj };
+      try {
+        const res = await fetch(BACKEND, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Server returned ' + res.status);
+        // backend may respond with updated row(s)
+        const data = await res.json().catch(() => null);
+        if (data && (data.orders || data.order)) handleLoadedData(data);
+      } catch (err) {
+        console.error('Push error', err);
+        alert('Failed to push update: ' + err.message);
+      }
+    }
+
+    // allow manual download of current in-memory XLSX
+    qs('#downloadXlsx').addEventListener('click', () => {
+      const ws = XLSX.utils.json_to_sheet(orders.map(o => o.raw || o));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+      XLSX.writeFile(wb, 'CampusCart-Orders-export.xlsx');
+    });
+
+    // ---------------- UTILITIES ----------------
+    function escapeHtml(s) { return (s===null||s===undefined)?'':String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    function shorten(s, n){ if(!s) return ''; return s.length>n?s.slice(0,n-1)+'…':s; }
+    function statusColor(st){
+      if(!st) return 'bg-gray-200';
+      if(st.includes('pend')) return 'bg-yellow-100';
+      if(st.includes('confirm')) return 'bg-sky-100';
+      if(st.includes('process')) return 'bg-teal-100';
+      if(st.includes('deliv')) return 'bg-green-100';
+      return 'bg-gray-100';
+    }
+
+    // ---------------- AUTO REFRESH ----------------
+    function configureAutoRefresh() {
+      const ms = Number(qs('#autoRefresh').value || 0);
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      if (ms > 0) autoRefreshTimer = setInterval(fetchBackend, ms);
+    }
+
+    qs('#autoRefresh').addEventListener('change', configureAutoRefresh);
+    qs('#refreshNow').addEventListener('click', fetchBackend);
+
+    // search & filter
+    qs('#search').addEventListener('input', renderOrders);
+    qs('#filterStatus').addEventListener('change', renderOrders);
+
+    // initial load
+    (async function init(){
+      configureAutoRefresh();
+      await fetchBackend();
+    }());
+  </script>
+</body>
+</html>
